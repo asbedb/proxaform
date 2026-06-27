@@ -1,0 +1,6 @@
+virtual_env_user = "yourusername@pam"
+virtual_env_pass = "your-prox-mox-user-password"
+api_url = "https://192.168.0.222:8006/"
+nic_name = "vmbr0"
+ssh_key = "your_ssh_key"
+os_pass = "SecurePasswordForYourAnsibleControlNodeLXC"
