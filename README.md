@@ -18,7 +18,12 @@ Before you begin, ensure you have the following installed and configured:
 It is recommended to setup a privleged user account dedicated to terraform to complete the provisioning of your LXC. The Account will require the following permissions to complete the task.
 
 ```text
-Datastore.Allocate, Datastore.AllocateSpace, Datastore.AllocateTemplate, Datastore.Audit, Mapping.Audit, Mapping.Modify, Permissions.Modify, Pool.Allocate, Pool.Audit, Realm.AllocateUser, SDN.Allocate, SDN.Audit, SDN.Use, Sys.AccessNetwork, Sys.Audit, Sys.Console, Sys.Incoming, Sys.Modify, Sys.Syslog, User.Modify, VM.Allocate, VM.Audit, VM.Backup, VM.Clone, VM.Config.CDROM, VM.Config.CPU, VM.Config.Cloudinit, VM.Config.Disk, VM.Config.HWType, VM.Config.Memory, VM.Config.Network, VM.Config.Options, VM.Console, VM.GuestAgent.Audit, VM.GuestAgent.FileRead, VM.GuestAgent.FileSystemMgmt, VM.GuestAgent.FileWrite, VM.GuestAgent.Unrestricted, VM.Migrate, VM.PowerMgmt, VM.Replicate, VM.Snapshot, VM.Snapshot.Rollback
+Datastore.Allocate, Datastore.AllocateSpace, Datastore.AllocateTemplate, Datastore.Audit, Mapping.Audit, Mapping.Modify,
+Permissions.Modify, Pool.Allocate, Pool.Audit, Realm.AllocateUser, SDN.Allocate, SDN.Audit, SDN.Use, Sys.AccessNetwork,
+Sys.Audit, Sys.Console, Sys.Incoming, Sys.Modify, Sys.Syslog, User.Modify, VM.Allocate, VM.Audit, VM.Backup, VM.Clone,
+VM.Config.CDROM, VM.Config.CPU, VM.Config.Cloudinit, VM.Config.Disk, VM.Config.HWType, VM.Config.Memory, VM.Config.Network,
+VM.Config.Options, VM.Console, VM.GuestAgent.Audit, VM.GuestAgent.FileRead, VM.GuestAgent.FileSystemMgmt, VM.GuestAgent.FileWrite,
+VM.GuestAgent.Unrestricted, VM.Migrate, VM.PowerMgmt, VM.Replicate, VM.Snapshot, VM.Snapshot.Rollback
 ```
 
 ---
