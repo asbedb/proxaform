@@ -1,6 +1,16 @@
+proxmox_host = "prox"
+lxc_template_name = "local:vztmpl/ubuntu-24.04-standard_24.04-2_amd64.tar.zst"
+lxc_template_type = "ubuntu"
+node_host_name = "ansible-control-node"
+node_ipv4_address = "192.168.0.150/24"
+node_default_ipv4_gateway = "192.168.0.1"
+vm_id = 200
+disk_datastore_id = "local-lvm"
+disk_size = 8
+network_interface_name = "eth0"
 virtual_env_user = "yourusername@pam"
 virtual_env_pass = "your-prox-mox-user-password"
 api_url = "https://192.168.0.222:8006/"
 nic_name = "vmbr0"
 ssh_key = "your_ssh_key"
-os_pass = "SecurePasswordForYourAnsibleControlNodeLXC"
+os_pass = "SecurePasswordForVM"
