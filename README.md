@@ -42,61 +42,7 @@ cp example.terraform.tfvars terraform.tfvars
 
 ```
 
-Open your newly created `terraform.tfvars` file and update the parameters with your details:
-
-```hcl
-virtual_env_user = "yourusername@pam"
-virtual_env_pass = "your-prox-mox-user-password"
-api_url          = "https://192.168.0.222:8006/"
-nic_name         = "vmbr0"
-ssh_key          = "your_ssh_key"
-os_pass          = "SecurePasswordForYourAnsibleControlNodeLXC"
-
-```
-
-#### Optional Customizations
-
-In addition to the core variables above, you can review and override the defaults defined in `vars.tf` to match your cluster requirements:
-
-```hcl
-variable "proxmox_host" {
-    default = "prox"
-}
-
-variable "lxc_template_name" {
-    default = "local:vztmpl/ubuntu-24.04-standard_24.04-2_amd64.tar.zst"
-}
-variable "lxc_template_type"{
-    default = "ubuntu"
-}
-
-variable "node_host_name"{
-    default = "ansible-control-node"
-}
-
-variable "node_ipv4_address"{
-    default = "192.168.0.150/24"
-}
-
-variable "node_default_ipv4_gateway"{
-    default = "192.168.0.1"
-}
-
-variable "vm_id"{
-    default = "200"
-}
-
-variable "disk_datastore_id"{
-    default = "local-lvm"
-}
-
-variable "disk_size"{
-    default = 8
-}
-variable "network_interface_name"{
-    default = "eth0"
-}
-```
+Open your newly created `terraform.tfvars` file and update the parameters with your details.
 
 ### Deploy with Terraform
 
