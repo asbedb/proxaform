@@ -35,7 +35,6 @@ VM.GuestAgent.Unrestricted, VM.Migrate, VM.PowerMgmt, VM.Replicate, VM.Snapshot,
 ```bash
 git clone https://github.com/asbedb/proxaform.git
 cd proxaform/terraform
-
 ```
 
 ### Configure Variables
@@ -44,7 +43,6 @@ To securely store your environment details, copy the example variables template 
 
 ```bash
 cp example.terraform.tfvars terraform.tfvars
-
 ```
 
 Open your newly created `terraform.tfvars` file and update the parameters with your details.
