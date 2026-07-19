@@ -25,6 +25,7 @@ resource "proxmox_virtual_environment_container" "ubuntu_container" {
     hostname = var.node_host_name
     user_account {
       password = var.os_pass
+      keys     = [var.ssh_key]
     }
     ip_config {
       ipv4 {
