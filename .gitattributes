@@ -1,0 +1,9 @@
+# Force Linux line endings (LF) for all shell scripts
+*.sh text eol=lf
+
+# Force LF for all HashiCorp Configuration Language files
+*.tf text eol=lf
+*.tfvars text eol=lf
+
+# Explicitly declare text files to be normalized automatically
+* text=auto
