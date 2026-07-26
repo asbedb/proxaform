@@ -102,7 +102,7 @@ Select the `.tfvars` file matching the deployment you want removed, then type `D
 - `secrets/` and `logs/` are excluded from version control via `.gitignore`, along with `*.tfvars`, `*.tfstate*`, and other sensitive Terraform artifacts.
 - Proxmox and OS-level credentials are collected at runtime and are not written into saved `.tfvars` files — you'll be prompted for them each time `deploy.sh` or `destroy.sh` needs to authenticate.
 - Terraform variables carrying credentials are marked `sensitive = true`, which redacts them from `plan`/`apply` console output.
-- Terraform state still stores applied values in plaintext by default. If you sync, back up, or share `terraform.tfstate`, consider enabling [state encryption](https://developer.hashicorp.com/terraform/language/state/encryption) or moving to a remote encrypted backend.
+- Terraform state still stores applied values in plaintext by default. If you sync, back up, or share `terraform.tfstate`, consider enabling state encryption or moving to a remote encrypted backend.
 - `insecure = true` is set on the Proxmox provider for convenience with self-signed certificates — replace this with proper TLS verification in production environments.
 
 ## Contributing
