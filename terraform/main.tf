@@ -8,41 +8,41 @@ terraform {
 }
 
 provider "proxmox" {
-  endpoint = var.proxmox_url
-  username = var.virtual_env_user
-  password = var.virtual_env_pass
+  endpoint = var.proxmox_api_url_with_port
+  username = var.proxmox_privileged_user_username
+  password = var.proxmox_privileged_user_password
   insecure = true
 }
 
 resource "proxmox_virtual_environment_container" "ubuntu_container" {
-  node_name    = var.proxmox_host
+  node_name    = var.proxmox_root_node_name
   vm_id        = var.vm_id
   unprivileged = true
   features {
     nesting = true
   }
   initialization {
-    hostname = var.node_host_name
+    hostname = var.container_name
     user_account {
-      password = var.os_pass
-      keys     = [var.ssh_key]
+      password = var.container_root_password
+      keys     = [var.authorised_ssh_key]
     }
     ip_config {
       ipv4 {
-        address = var.node_ipv4_address
-        gateway = var.node_default_ipv4_gateway
+        address = var.container_ipv4_address_cidr
+        gateway = var.container_ipv4_gateway
       }
     }
   }
 
   network_interface {
-    name   = var.network_interface_name
-    bridge = var.nic_name
+    name   = var.container_network_interface_name
+    bridge = var.container_network_bridge_name
   }
 
   operating_system {
-    template_file_id = var.lxc_template_name
-    type             = var.lxc_template_type
+    template_file_id = var.proxmox_lxc_template_name
+    type             = var.proxmox_lxc_template_type
   }
 
   disk {

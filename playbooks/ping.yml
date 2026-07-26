@@ -1,0 +1,8 @@
+---
+- name: Test Connectivity
+  hosts: proxmox_nodes
+  gather_facts: false
+
+  tasks:
+      - name: Ping host via Ansible module
+        ansible.builtin.ping:

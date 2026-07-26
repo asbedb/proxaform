@@ -1,11 +1,11 @@
 output "node_ip" {
   description = "The IP address of the container"
-  value       = var.node_ipv4_address
+  value       = var.container_ipv4_address_cidr
 }
 
 output "node_hostname" {
   description = "The hostname of the container"
-  value       = var.node_host_name
+  value       = var.container_name
 }
 
 output "vm_id" {

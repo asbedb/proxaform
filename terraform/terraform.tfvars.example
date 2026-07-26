@@ -1,16 +1,25 @@
-proxmox_host = "prox"
-lxc_template_name = "local:vztmpl/ubuntu-24.04-standard_24.04-2_amd64.tar.zst"
-lxc_template_type = "ubuntu"
-node_host_name = "ansible-control-node"
-node_ipv4_address = "192.168.0.150/24"
-node_default_ipv4_gateway = "192.168.0.1"
-vm_id = 200
-disk_datastore_id = "local-lvm"
-disk_size = 8
-network_interface_name = "eth0"
-virtual_env_user = "yourusername@pam"
-virtual_env_pass = "your-prox-mox-user-password"
-proxmox_url = "https://192.168.0.222:8006/"
-nic_name = "vmbr0"
-ssh_key = "your_ssh_key"
-os_pass = "SecurePasswordForVM"
+# Proxmox Provider Configuration
+proxmox_api_url_with_port        = "https://192.168.1.100:8006/"
+proxmox_privileged_user_username = "root@pam"
+proxmox_privileged_user_password = "YourSecretProxmoxPassword"
+
+# Node & Container Identification
+proxmox_root_node_name          = "pve"
+vm_id                           = 100
+container_name                  = "ubuntu-lxc"
+container_root_password         = "YourSecretContainerPassword"
+authorised_ssh_key              = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQ..."
+
+# Network Settings
+container_ipv4_address_cidr    = "192.168.1.50/24"
+container_ipv4_gateway         = "192.168.1.1"
+container_network_interface_name = "eth0"
+container_network_bridge_name   = "vmbr0"
+
+# OS Template Settings
+proxmox_lxc_template_name       = "local:vztmpl/ubuntu-22.04-standard_22.04-1_amd64.tar.zst"
+proxmox_lxc_template_type       = "ubuntu"
+
+# Storage Settings
+disk_datastore_id               = "local-lvm"
+disk_size                       = 8 # Size in GB

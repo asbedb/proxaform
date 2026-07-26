@@ -11,3 +11,8 @@ override.tf.json
 .terraform/
 .env
 terraform.exe
+logs/*
+proxaform/*
+secrets/*
+hosts.ini
+*.lock.hcl
