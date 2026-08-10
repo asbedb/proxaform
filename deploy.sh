@@ -156,7 +156,9 @@ else
 fi
 
 TF_VARS_FILE=$(realpath "$SELECTED_TFVAR")
+TF_STATE_FILE="${TF_VARS_FILE%.tfvars}.tfstate"
 echo "Using tfvars file: ${TF_VARS_FILE}"
+echo "Using state file:  ${TF_STATE_FILE}"
 
 echo ""
 echo ">>> Step 1/3: Provisioning Node via Terraform..."
@@ -169,11 +171,11 @@ fi
 pushd "$TF_DIR" > /dev/null || exit 1
 
 terraform init
-terraform apply -var-file="$TF_VARS_FILE" -var="authorised_ssh_key=${SSH_PUBLIC_KEY}" -auto-approve
+terraform apply -state="$TF_STATE_FILE" -var-file="$TF_VARS_FILE" -var="authorised_ssh_key=${SSH_PUBLIC_KEY}" -auto-approve
 
-NODE_IP=$(terraform output -raw node_ip)
-NODE_HOSTNAME=$(terraform output -raw node_hostname)
-VM_ID=$(terraform output -raw vm_id)
+NODE_IP=$(terraform output -state="$TF_STATE_FILE" -raw node_ip)
+NODE_HOSTNAME=$(terraform output -state="$TF_STATE_FILE" -raw node_hostname)
+VM_ID=$(terraform output -state="$TF_STATE_FILE" -raw vm_id)
 
 popd > /dev/null || exit 1
 
@@ -182,16 +184,86 @@ CLEAN_IP=$(echo "$NODE_IP" | cut -d'/' -f1)
 echo ""
 echo ">>> Step 2/3: Recording Deployment Details & Updating Ansible Inventory..."
 
-cat <<EOF > "$INVENTORY_FILE"
-[proxmox_nodes]
-${NODE_HOSTNAME} ansible_host=${CLEAN_IP} ansible_user=root
-
-[proxmox_nodes:vars]
+if [ ! -f "$INVENTORY_FILE" ]; then
+    cat <<EOF > "$INVENTORY_FILE"
+[all:vars]
 ansible_python_interpreter=/usr/bin/python3
 ansible_ssh_common_args='-o StrictHostKeyChecking=no'
-EOF
 
-echo "Ansible inventory successfully written to '${INVENTORY_FILE}'."
+EOF
+fi
+
+mapfile -t EXISTING_GROUPS < <(grep -oP '^\[\K[^\]]+(?=\])' "$INVENTORY_FILE" | grep -v ':vars$' | sort -u)
+
+SELECTED_GROUPS=("proxmox_nodes") # Always include default group
+
+echo ""
+echo "Current inventory groups found in '${INVENTORY_FILE}':"
+echo "------------------------------------------"
+if [ ${#EXISTING_GROUPS[@]} -eq 0 ]; then
+    echo " (No user groups found yet)"
+else
+    for i in "${!EXISTING_GROUPS[@]}"; do
+        printf "  [%d] %s\n" "$((i+1))" "${EXISTING_GROUPS[$i]}"
+    done
+fi
+echo "------------------------------------------"
+
+while true; do
+    echo ""
+    read -rp "Assign to an existing group [number], type a new group name, or press [Enter] to stick with default '${SELECTED_GROUPS[*]}': " GROUP_INPUT
+
+    if [ -z "$GROUP_INPUT" ]; then
+        break
+    elif [[ "$GROUP_INPUT" =~ ^[0-9]+$ ]] && [ "$GROUP_INPUT" -ge 1 ] && [ "$GROUP_INPUT" -le "${#EXISTING_GROUPS[@]}" ]; then
+        CHOSEN_GROUP="${EXISTING_GROUPS[$((GROUP_INPUT-1))]}"
+        SELECTED_GROUPS+=("$CHOSEN_GROUP")
+        echo "--> Added node to existing group: ${CHOSEN_GROUP}"
+    else
+        # Clean custom group string (strip brackets if user typed them)
+        CLEAN_GROUP=$(echo "$GROUP_INPUT" | tr -d '[]' | xargs)
+        if [ -n "$CLEAN_GROUP" ]; then
+            SELECTED_GROUPS+=("$CLEAN_GROUP")
+            echo "--> Created and assigned node to new custom group: [${CLEAN_GROUP}]"
+        fi
+    fi
+
+    read -rp "Add to another group? (y/N): " ADD_MORE
+    if [[ ! "${ADD_MORE,,}" =~ ^(y|yes)$ ]]; then
+        break
+    fi
+done
+
+mapfile -t UNIQUE_GROUPS < <(printf "%s\n" "${SELECTED_GROUPS[@]}" | sort -u)
+
+add_host_to_group() {
+    local group="$1"
+    local hostname="$2"
+    local ip="$3"
+    local file="$4"
+
+    local host_line="${hostname} ansible_host=${ip} ansible_user=root"
+
+    if grep -q "^\[${group}\]" "$file"; then
+        if ! awk -v g="[${group}]" -v h="$hostname" '
+            $0 == g {in_section=1; next}
+            /^\[/ {in_section=0}
+            in_section && $1 == h {found=1}
+            END {exit !found}
+        ' "$file"; then
+            sed -i "/^\[${group}\]/a ${host_line}" "$file"
+        fi
+    else
+        # Append new section to end of file
+        echo -e "\n[${group}]\n${host_line}" >> "$file"
+    fi
+}
+
+for grp in "${UNIQUE_GROUPS[@]}"; do
+    add_host_to_group "$grp" "$NODE_HOSTNAME" "$CLEAN_IP" "$INVENTORY_FILE"
+done
+
+echo "Ansible inventory successfully updated in '${INVENTORY_FILE}'."
 
 cat <<EOF
 
