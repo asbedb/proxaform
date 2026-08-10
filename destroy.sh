@@ -6,6 +6,7 @@ LOG_FILE="${LOG_DIR}/destroy_$(date +%Y%m%d_%H%M%S).log"
 TF_DIR="terraform"
 SECRETS_DIR="secrets"
 PUB_KEY_PATH="${SECRETS_DIR}/id_ed25519.pub"
+INVENTORY_FILE="hosts.ini"
 
 mkdir -p "$LOG_DIR"
 
@@ -31,7 +32,6 @@ if [ ! -f "$PUB_KEY_PATH" ]; then
 fi
 SSH_PUBLIC_KEY=$(cat "$PUB_KEY_PATH")
 
-# Find existing tfvars
 mkdir -p "$SECRETS_DIR"
 mapfile -t TFVARS < <(find "$SECRETS_DIR" -maxdepth 1 -type f -name "*.tfvars" | sort)
 
@@ -60,7 +60,26 @@ while true; do
 done
 
 TF_VARS_FILE=$(realpath "$SELECTED_TFVAR")
+TF_STATE_FILE="${TF_VARS_FILE%.tfvars}.tfstate"
 echo "Selected target: ${TF_VARS_FILE}"
+echo "Target state:  ${TF_STATE_FILE}"
+
+if [ ! -f "$TF_STATE_FILE" ]; then
+    echo "WARNING: State file '${TF_STATE_FILE}' does not exist."
+    echo "This target may have already been destroyed or was never deployed."
+fi
+
+
+pushd "$TF_DIR" > /dev/null || exit 1
+terraform init > /dev/null 2>&1
+NODE_IP=$(terraform output -state="$TF_STATE_FILE" -raw node_ip)
+popd > /dev/null || exit 1
+
+if [ -z "$NODE_IP" ] && [ -f "$TF_VARS_FILE" ]; then
+    NODE_IP=$(grep -oP 'container_ipv4_address_cidr\s*=\s*"\K[^"/]+' "$TF_VARS_FILE" || true)
+fi
+
+CLEAN_IP=$(echo "$NODE_IP" | cut -d'/' -f1)
 
 echo ""
 echo "WARNING: You are about to DESTROY infrastructure defined by:"
@@ -73,14 +92,65 @@ if [ "$CONFIRMATION" != "DESTROY" ]; then
 fi
 
 echo ""
-echo ">>> Initiating Terraform Destroy..."
+echo ">>> Step 1/2: Initiating Terraform Destroy..."
 
 pushd "$TF_DIR" > /dev/null || exit 1
 
 terraform init
-terraform destroy -var-file="$TF_VARS_FILE" -var="authorised_ssh_key=${SSH_PUBLIC_KEY}" -auto-approve
+terraform destroy -state="$TF_STATE_FILE" -var-file="$TF_VARS_FILE" -var="authorised_ssh_key=${SSH_PUBLIC_KEY}" -auto-approve
+
 
 popd > /dev/null || exit 1
+echo ""
+echo ">>> Step 2/2: Cleaning Ansible Inventory (${INVENTORY_FILE})..."
+
+if [ -n "$CLEAN_IP" ] && [ -f "$INVENTORY_FILE" ]; then
+    echo "Removing entries matching IP: ${CLEAN_IP}..."
+    sed -i "/\b${CLEAN_IP}\b/d" "$INVENTORY_FILE"
+    TMP_INVENTORY=$(mktemp)
+    awk '
+    /^\[/ {
+        if (header != "" && count == 0 && header !~ /:vars\]$/ && header != "[all:vars]") {
+            # Skip empty section header
+        } else if (header != "") {
+            print header
+            for (i = 1; i <= lines_count; i++) {
+                print lines[i]
+            }
+        }
+        header = $0
+        lines_count = 0
+        count = 0
+        next
+    }
+    {
+        if (header != "") {
+            lines_count++
+            lines[lines_count] = $0
+            if ($0 !~ /^[[:space:]]*$/ && $0 !~ /^[[:space:]]*#/) {
+                count++
+            }
+        } else {
+            print $0
+        }
+    }
+    END {
+        if (header != "" && count == 0 && header !~ /:vars\]$/ && header != "[all:vars]") {
+            # Skip empty trailing section
+        } else if (header != "") {
+            print header
+            for (i = 1; i <= lines_count; i++) {
+                print lines[i]
+            }
+        }
+    }
+    ' "$INVENTORY_FILE" > "$TMP_INVENTORY"
+    cat -s "$TMP_INVENTORY" > "$INVENTORY_FILE"
+    rm -f "$TMP_INVENTORY"
+    echo "Ansible inventory successfully updated."
+else
+    echo "No matching IP or inventory file found to clean up. Skipping inventory update."
+fi
 
 echo ""
 echo "=========================================="
