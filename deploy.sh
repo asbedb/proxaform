@@ -2,8 +2,9 @@
 set -eo pipefail
 
 LOG_DIR="logs"
+INVENTORY_DIR="inventory"
 LOG_FILE="${LOG_DIR}/deploy_$(date +%Y%m%d_%H%M%S).log"
-INVENTORY_FILE="hosts.ini"
+INVENTORY_FILE="${INVENTORY_DIR}/hosts.ini"
 TF_DIR="terraform"
 PLAYBOOK_DIR="playbooks"
 SECRETS_DIR="secrets"
