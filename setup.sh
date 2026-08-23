@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -eo pipefail
 
-LOG_DIR="logs"
+LOG_DIR="logs/setup"
 LOG_FILE="${LOG_DIR}/setup_$(date +%Y%m%d_%H%M%S).log"
 HCL_GPG="https://apt.releases.hashicorp.com/gpg"
 HCL_APT_REPO="https://apt.releases.hashicorp.com"
@@ -18,8 +18,8 @@ echo "Contributions are welcome"
 echo "=========================================="
 echo "        Starting Installation             "
 echo "=========================================="
-if command -v ansible &> /dev/null && command -v terraform &> /dev/null; then
-    echo "Ansible and Terraform are already installed. Skipping package installation..."
+if command -v ansible &> /dev/null && command -v terraform &> /dev/null && command -v yq &> /dev/null; then
+    echo "Ansible and Terraform and yq are already installed. Skipping package installation..."
 else
     echo "Prerequisites missing. Detecting OS to install core dependencies..."
     if [[ "$OSTYPE" == "linux-gnu"* ]]; then
@@ -60,6 +60,11 @@ else
                 echo "Installing Terraform..."
                 sudo apt-get install -y terraform
             fi
+            if ! command -v yq &> /dev/null; then
+                echo "Installing yq..."
+                sudo wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O /usr/bin/yq
+                sudo chmod +x /usr/bin/yq
+            fi
             ;;
             
         centos|rhel|rocky|almalinux)
@@ -81,6 +86,11 @@ else
                 echo "Installing Terraform..."
                 sudo dnf install -y terraform
             fi
+            if ! command -v yq &> /dev/null; then
+                echo "Installing yq..."
+                sudo wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O /usr/bin/yq
+                sudo chmod +x /usr/bin/yq
+            fi
             ;;
             
         *)
@@ -100,6 +110,7 @@ else
     echo "Ansible command was not found in PATH."
     exit 1
 fi
+
 if command -v terraform &> /dev/null; then
     TF_VERSION=$(terraform --version | head -n 1)
     echo "Success! $TF_VERSION is installed."
@@ -107,6 +118,15 @@ else
     echo "Terraform command was not found in PATH."
     exit 1
 fi
+
+if command -v yq &> /dev/null; then
+    YQ_VERSION=$(yq --version | head -n 1)
+    echo "Success! $YQ_VERSION is installed."
+else
+    echo "yq command was not found in PATH."
+    exit 1
+fi
+
 echo ""
 echo "Setting up local SSH key pair..."
 mkdir -p "$KEY_DIR"

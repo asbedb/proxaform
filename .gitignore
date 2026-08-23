@@ -14,5 +14,5 @@ terraform.exe
 logs/*
 proxaform/*
 secrets/*
-hosts.ini
+hosts.yml
 *.lock.hcl

@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 set -eo pipefail
 
-LOG_DIR="logs"
+LOG_DIR="logs/destroy"
 LOG_FILE="${LOG_DIR}/destroy_$(date +%Y%m%d_%H%M%S).log"
+INVENTORY_DIR="inventory"
 TF_DIR="terraform"
 SECRETS_DIR="secrets"
 PUB_KEY_PATH="${SECRETS_DIR}/id_ed25519.pub"
-INVENTORY_FILE="hosts.ini"
+INVENTORY_FILE="${INVENTORY_DIR}/hosts.yml"
 
 mkdir -p "$LOG_DIR"
 
@@ -104,52 +105,19 @@ popd > /dev/null || exit 1
 echo ""
 echo ">>> Step 2/2: Cleaning Ansible Inventory (${INVENTORY_FILE})..."
 
-if [ -n "$CLEAN_IP" ] && [ -f "$INVENTORY_FILE" ]; then
-    echo "Removing entries matching IP: ${CLEAN_IP}..."
-    sed -i "/\b${CLEAN_IP}\b/d" "$INVENTORY_FILE"
-    TMP_INVENTORY=$(mktemp)
-    awk '
-    /^\[/ {
-        if (header != "" && count == 0 && header !~ /:vars\]$/ && header != "[all:vars]") {
-            # Skip empty section header
-        } else if (header != "") {
-            print header
-            for (i = 1; i <= lines_count; i++) {
-                print lines[i]
-            }
-        }
-        header = $0
-        lines_count = 0
-        count = 0
-        next
-    }
-    {
-        if (header != "") {
-            lines_count++
-            lines[lines_count] = $0
-            if ($0 !~ /^[[:space:]]*$/ && $0 !~ /^[[:space:]]*#/) {
-                count++
-            }
-        } else {
-            print $0
-        }
-    }
-    END {
-        if (header != "" && count == 0 && header !~ /:vars\]$/ && header != "[all:vars]") {
-            # Skip empty trailing section
-        } else if (header != "") {
-            print header
-            for (i = 1; i <= lines_count; i++) {
-                print lines[i]
-            }
-        }
-    }
-    ' "$INVENTORY_FILE" > "$TMP_INVENTORY"
-    cat -s "$TMP_INVENTORY" > "$INVENTORY_FILE"
-    rm -f "$TMP_INVENTORY"
-    echo "Ansible inventory successfully updated."
+if [ -f "$INVENTORY_FILE" ]; then
+    if [ -n "$CLEAN_IP" ]; then
+        echo "Removing host entries matching IP '${CLEAN_IP}' across all groups using yq..."
+        yq eval -i "del(.all.children.[].hosts[] | select(.ansible_host == \"${CLEAN_IP}\"))" "$INVENTORY_FILE"
+    elif [ -n "$NODE_HOSTNAME" ]; then
+        echo "Removing host entries matching Hostname '${NODE_HOSTNAME}' using yq..."
+        yq eval -i "del(.all.children.[].hosts.${NODE_HOSTNAME})" "$INVENTORY_FILE"
+    fi
+    echo "Pruning empty inventory groups..."
+    yq eval -i 'del(.all.children[] | select(.hosts == null or (.hosts | length == 0)))' "$INVENTORY_FILE"
+    echo "Ansible YAML inventory successfully cleaned up."
 else
-    echo "No matching IP or inventory file found to clean up. Skipping inventory update."
+    echo "Inventory file '${INVENTORY_FILE}' not found. Skipping inventory update."
 fi
 
 echo ""
