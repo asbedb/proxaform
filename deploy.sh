@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 set -eo pipefail
 
-LOG_DIR="logs"
+LOG_DIR="logs/deploy"
 INVENTORY_DIR="inventory"
 LOG_FILE="${LOG_DIR}/deploy_$(date +%Y%m%d_%H%M%S).log"
-INVENTORY_FILE="${INVENTORY_DIR}/hosts.ini"
+INVENTORY_FILE="${INVENTORY_DIR}/hosts.yml"
 TF_DIR="terraform"
 PLAYBOOK_DIR="playbooks"
 SECRETS_DIR="secrets"
@@ -187,14 +187,15 @@ echo ">>> Step 2/3: Recording Deployment Details & Updating Ansible Inventory...
 
 if [ ! -f "$INVENTORY_FILE" ]; then
     cat <<EOF > "$INVENTORY_FILE"
-[all:vars]
-ansible_python_interpreter=/usr/bin/python3
-ansible_ssh_common_args='-o StrictHostKeyChecking=no'
-
+all:
+  vars:
+    ansible_python_interpreter: /usr/bin/python3
+    ansible_ssh_common_args: '-o StrictHostKeyChecking=no'
+  children: {}
 EOF
 fi
 
-mapfile -t EXISTING_GROUPS < <(grep -oP '^\[\K[^\]]+(?=\])' "$INVENTORY_FILE" | grep -v ':vars$' | sort -u)
+mapfile -t EXISTING_GROUPS < <(yq eval '.all.children | keys | .[]' "$INVENTORY_FILE" 2>/dev/null | sort -u || true)
 
 SELECTED_GROUPS=("proxmox_nodes") # Always include default group
 
@@ -221,7 +222,6 @@ while true; do
         SELECTED_GROUPS+=("$CHOSEN_GROUP")
         echo "--> Added node to existing group: ${CHOSEN_GROUP}"
     else
-        # Clean custom group string (strip brackets if user typed them)
         CLEAN_GROUP=$(echo "$GROUP_INPUT" | tr -d '[]' | xargs)
         if [ -n "$CLEAN_GROUP" ]; then
             SELECTED_GROUPS+=("$CLEAN_GROUP")
@@ -237,31 +237,21 @@ done
 
 mapfile -t UNIQUE_GROUPS < <(printf "%s\n" "${SELECTED_GROUPS[@]}" | sort -u)
 
-add_host_to_group() {
+add_host_to_group_yq() {
     local group="$1"
     local hostname="$2"
     local ip="$3"
     local file="$4"
 
-    local host_line="${hostname} ansible_host=${ip} ansible_user=root"
-
-    if grep -q "^\[${group}\]" "$file"; then
-        if ! awk -v g="[${group}]" -v h="$hostname" '
-            $0 == g {in_section=1; next}
-            /^\[/ {in_section=0}
-            in_section && $1 == h {found=1}
-            END {exit !found}
-        ' "$file"; then
-            sed -i "/^\[${group}\]/a ${host_line}" "$file"
-        fi
-    else
-        # Append new section to end of file
-        echo -e "\n[${group}]\n${host_line}" >> "$file"
-    fi
+    # Safely upsert host data under .all.children.<group>.hosts.<hostname>
+    yq eval -i "
+      .all.children.${group}.hosts.${hostname}.ansible_host = \"${ip}\" |
+      .all.children.${group}.hosts.${hostname}.ansible_user = \"root\"
+    " "$file"
 }
 
 for grp in "${UNIQUE_GROUPS[@]}"; do
-    add_host_to_group "$grp" "$NODE_HOSTNAME" "$CLEAN_IP" "$INVENTORY_FILE"
+    add_host_to_group_yq "$grp" "$NODE_HOSTNAME" "$CLEAN_IP" "$INVENTORY_FILE"
 done
 
 echo "Ansible inventory successfully updated in '${INVENTORY_FILE}'."
