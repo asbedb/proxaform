@@ -16,3 +16,4 @@ proxaform/*
 secrets/*
 hosts.yml
 *.lock.hcl
+wget-log
