@@ -9,6 +9,7 @@ SECRETS_DIR="secrets"
 PUB_KEY_PATH="${SECRETS_DIR}/id_ed25519.pub"
 INVENTORY_FILE="${INVENTORY_DIR}/hosts.yml"
 
+
 mkdir -p "$LOG_DIR"
 
 exec > >(tee -a "$LOG_FILE") 2>&1
@@ -34,57 +35,46 @@ fi
 SSH_PUBLIC_KEY=$(cat "$PUB_KEY_PATH")
 
 mkdir -p "$SECRETS_DIR"
-mapfile -t TFVARS < <(find "$SECRETS_DIR" -maxdepth 1 -type f -name "*.tfvars" | sort)
+mapfile -t TFSTATES < <(find "$SECRETS_DIR" -maxdepth 1 -type f -name "*.tfstate" | sort)
 
-if [ "${#TFVARS[@]}" -eq 0 ]; then
-    echo "ERROR: No .tfvars files found in '${SECRETS_DIR}/'."
-    echo "There are no targeted configurations available to destroy."
+if [ "${#TFSTATES[@]}" -eq 0 ]; then
+    echo "ERROR: No .tfstate files found in '${SECRETS_DIR}/'."
+    echo "There are no active state targets available to destroy."
     exit 1
 fi
 
-echo ""
-echo "Available .tfvars targets in '${SECRETS_DIR}/':"
+echo "Available .tfstate targets in '${SECRETS_DIR}/':"
 echo "------------------------------------------"
-for i in "${!TFVARS[@]}"; do
-    printf "  [%d] %s\n" "$((i+1))" "$(basename "${TFVARS[$i]}")"
+for i in "${!TFSTATES[@]}"; do
+    printf "  [%d] %s\n" "$((i+1))" "$(basename "${TFSTATES[$i]}")"
 done
 echo "------------------------------------------"
 
 while true; do
-    read -rp "Select the tfvars file to DESTROY [1-${#TFVARS[@]}]: " TF_CHOICE
-    if [[ "$TF_CHOICE" =~ ^[0-9]+$ ]] && [ "$TF_CHOICE" -ge 1 ] && [ "$TF_CHOICE" -le "${#TFVARS[@]}" ]; then
-        SELECTED_TFVAR="${TFVARS[$((TF_CHOICE-1))]}"
+    read -rp "Select the tfstate file to DESTROY [1-${#TFSTATES[@]}]: " TF_CHOICE
+    if [[ "$TF_CHOICE" =~ ^[0-9]+$ ]] && [ "$TF_CHOICE" -ge 1 ] && [ "$TF_CHOICE" -le "${#TFSTATES[@]}" ]; then
+        SELECTED_TFSTATE="${TFSTATES[$((TF_CHOICE-1))]}"
         break
     else
-        echo "Invalid selection. Enter a number between 1 and ${#TFVARS[@]}."
+        echo "Invalid selection. Enter a number between 1 and ${#TFSTATES[@]}."
     fi
 done
 
-TF_VARS_FILE=$(realpath "$SELECTED_TFVAR")
-TF_STATE_FILE="${TF_VARS_FILE%.tfvars}.tfstate"
-echo "Selected target: ${TF_VARS_FILE}"
-echo "Target state:  ${TF_STATE_FILE}"
-
-if [ ! -f "$TF_STATE_FILE" ]; then
-    echo "WARNING: State file '${TF_STATE_FILE}' does not exist."
-    echo "This target may have already been destroyed or was never deployed."
-fi
-
+TF_STATE_FILE=$(realpath "$SELECTED_TFSTATE")
+MATCHING_TFVARS="${TF_STATE_FILE%.tfstate}.tfvars"
+echo "Selected target state: ${TF_STATE_FILE}"
 
 pushd "$TF_DIR" > /dev/null || exit 1
 terraform init > /dev/null 2>&1
-NODE_IP=$(terraform output -state="$TF_STATE_FILE" -raw node_ip)
+NODE_IP=$(terraform output -state="$TF_STATE_FILE" -raw node_ip 2>/dev/null || true)
 popd > /dev/null || exit 1
-
-if [ -z "$NODE_IP" ] && [ -f "$TF_VARS_FILE" ]; then
-    NODE_IP=$(grep -oP 'container_ipv4_address_cidr\s*=\s*"\K[^"/]+' "$TF_VARS_FILE" || true)
-fi
 
 CLEAN_IP=$(echo "$NODE_IP" | cut -d'/' -f1)
 
+
 echo ""
 echo "WARNING: You are about to DESTROY infrastructure defined by:"
-echo "         ${TF_VARS_FILE}"
+echo "         ${TF_STATE_FILE}"
 read -rp "Are you sure you want to proceed? Type 'DESTROY' to confirm: " CONFIRMATION
 
 if [ "$CONFIRMATION" != "DESTROY" ]; then
@@ -93,17 +83,36 @@ if [ "$CONFIRMATION" != "DESTROY" ]; then
 fi
 
 echo ""
-echo ">>> Step 1/2: Initiating Terraform Destroy..."
+echo ">>> Step 1/3: Initiating Terraform Destroy..."
 
 pushd "$TF_DIR" > /dev/null || exit 1
 
 terraform init
-terraform destroy -state="$TF_STATE_FILE" -var-file="$TF_VARS_FILE" -var="authorised_ssh_key=${SSH_PUBLIC_KEY}" -auto-approve
 
+if [ -f "$MATCHING_TFVARS" ]; then
+    echo "Using matching variable file: ${MATCHING_TFVARS}"
+    TARGET_VAR_FILE="$MATCHING_TFVARS"
+else
+    echo "WARNING: Matching .tfvars file not found at '${MATCHING_TFVARS}'."
+    echo "Generating temporary dummy variables to proceed with teardown..."
+    TARGET_VAR_FILE=$(mktemp --suffix=.tfvars)
+    trap 'rm -f "$TARGET_VAR_FILE"' EXIT
+    if [ -f "vars.tf" ]; then
+        grep -E '^\s*variable\s+"' vars.tf | cut -d'"' -f2 | while read -r var_name; do
+            echo "${var_name} = \"dummy\"" >> "$TARGET_VAR_FILE"
+        done
+    fi
+fi
+terraform destroy \
+    -var="authorised_ssh_key=${SSH_PUBLIC_KEY}" \
+    -state="$TF_STATE_FILE" \
+    -var-file="$TARGET_VAR_FILE" \
+    -refresh=false \
+    -auto-approve \
 
 popd > /dev/null || exit 1
 echo ""
-echo ">>> Step 2/2: Cleaning Ansible Inventory (${INVENTORY_FILE})..."
+echo ">>> Step 2/3: Cleaning Ansible Inventory (${INVENTORY_FILE})..."
 
 if [ -f "$INVENTORY_FILE" ]; then
     if [ -n "$CLEAN_IP" ]; then
@@ -118,6 +127,16 @@ if [ -f "$INVENTORY_FILE" ]; then
     echo "Ansible YAML inventory successfully cleaned up."
 else
     echo "Inventory file '${INVENTORY_FILE}' not found. Skipping inventory update."
+fi
+
+echo ""
+echo ">>> Step 3/3: Removing State Files..."
+if [ -f "$TF_STATE_FILE" ]; then
+    rm -f "$TF_STATE_FILE"
+    rm -f "${TF_STATE_FILE}.backup"
+    echo "Successfully removed state file and backup: ${TF_STATE_FILE}"
+else
+    echo "State file '${TF_STATE_FILE}' not found. Skipping deletion."
 fi
 
 echo ""
