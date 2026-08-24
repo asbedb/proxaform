@@ -1,8 +1,0 @@
----
-# Handlers triggered by task changes (notify keyword)
-
-- name: Restart my_role service
-  ansible.builtin.service:
-      name: "{{ my_role_service_name }}"
-      state: restarted
-  when: my_role_service_state != "stopped"
