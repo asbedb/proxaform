@@ -1,0 +1,31 @@
+---
+common_enable_ntp: true
+common_packages:
+    - curl
+    - wget
+    - tar
+    - unzip
+    - git
+    - htop
+    - net-tools
+    - ca-certificates
+    - rsync
+
+common_os_packages:
+    Debian:
+        - build-essential
+        - software-properties-common
+    RedHat:
+        - epel-release
+
+common_ntp_servers:
+    - 0.pool.ntp.org
+    - 1.pool.ntp.org
+    - 2.pool.ntp.org
+
+common_fallback_ntp_servers:
+    - cloudflare-dns.com
+    - time.google.com
+
+common_custom_ca_certs: []
+common_configure_motd: true
