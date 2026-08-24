@@ -1,0 +1,3 @@
+[Time]
+NTP={{ common_ntp_servers | default(['0.pool.ntp.org', '1.pool.ntp.org', '2.pool.ntp.org']) | join(' ') }}
+FallbackNTP={{ common_fallback_ntp_servers | default(['cloudflare-dns.com', 'time.google.com']) | join(' ') }}

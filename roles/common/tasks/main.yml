@@ -1,0 +1,45 @@
+---
+- name: Update apt cache (Debian/Ubuntu)
+  ansible.builtin.apt:
+      update_cache: true
+      cache_valid_time: 3600
+  when: ansible_facts['os_family'] == "Debian"
+
+- name: Install common system utilities
+  ansible.builtin.package:
+      name: "{{ common_packages + (common_os_packages[ansible_facts['os_family']] | default([])) }}"
+      state: present
+
+- name: Ensure NTP service is running
+  ansible.builtin.service:
+      name: "{{ 'chrony' if ansible_facts['os_family'] == 'RedHat' else 'systemd-timesyncd' }}"
+      state: started
+      enabled: true
+  when: common_enable_ntp
+
+- name: Deploy custom timesyncd NTP configuration
+  ansible.builtin.template:
+      src: timesyncd.conf.j2
+      dest: /etc/systemd/timesyncd.conf
+      owner: root
+      group: root
+      mode: "0644"
+  notify: Restart NTP service
+  when: common_enable_ntp and ansible_facts['os_family'] == "Debian"
+
+- name: Ensure custom CA certificates are present
+  ansible.builtin.copy:
+      src: "{{ item }}"
+      dest: "{{ '/etc/pki/ca-trust/source/anchors/' if ansible_facts['os_family'] == 'RedHat' else '/usr/local/share/ca-certificates/' }}"
+      mode: "0644"
+  loop: "{{ common_custom_ca_certs | default([]) }}"
+  notify: Update CA certificates
+
+- name: Deploy dynamic MOTD welcome message
+  ansible.builtin.template:
+      src: motd.j2
+      dest: /etc/motd
+      owner: root
+      group: root
+      mode: "0644"
+  when: common_configure_motd

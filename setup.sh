@@ -141,5 +141,20 @@ PUBLIC_KEY_CONTENT=$(cat "${KEY_FILE}.pub")
 mkdir -p secrets
 echo "$PUBLIC_KEY_CONTENT" > secrets/id_ed25519.pub
 echo "Public key safely mirrored to 'secrets/id_ed25519.pub'."
+echo ""
+echo "Generating local ansible.cfg..."
+if [ ! -f "ansible.cfg" ]; then
+    cat <<'EOF' > ansible.cfg
+[defaults]
+roles_path = ./roles
+host_key_checking = False
+retry_files_enabled = False
+stdout_callback = default
+result_format = yaml
+EOF
+    echo "ansible.cfg created successfully at project root."
+else
+    echo "Existing ansible.cfg found. Skipping generation..."
+fi
 echo "=========================================="
 echo "Environment ready!"

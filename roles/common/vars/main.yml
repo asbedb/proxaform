@@ -1,0 +1,7 @@
+common_os_packages:
+    Debian:
+        - build-essential
+        - software-properties-common
+    RedHat:
+        - epel-release
+        - coreutils
