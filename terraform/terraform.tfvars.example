@@ -11,8 +11,8 @@ container_root_password         = "YourSecretContainerPassword"
 authorised_ssh_key              = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQ..."
 
 # Network Settings
-container_ipv4_address_cidr    = "192.168.1.50/24"
-container_ipv4_gateway         = "192.168.1.1"
+container_ipv4_address_cidr     = "192.168.1.50/24"
+container_ipv4_gateway          = "192.168.1.1"
 container_network_interface_name = "eth0"
 container_network_bridge_name   = "vmbr0"
 
@@ -23,3 +23,8 @@ proxmox_lxc_template_type       = "ubuntu"
 # Storage Settings
 disk_datastore_id               = "local-lvm"
 disk_size                       = 8 # Size in GB
+
+# Resource Allocation
+container_cpu_cores              = 2
+container_ram_mb                = 2048 # Dedicated RAM in MB (2 GB)
+container_swap_mb               = 512  # Swap memory in MB

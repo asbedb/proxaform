@@ -1,0 +1,25 @@
+---
+# JVM & Service Configuration
+rundeck_java_package: "openjdk-11-jre"
+rundeck_service_enabled: true
+
+# Web Interface Settings
+rundeck_protocol: "http"
+rundeck_hostname: "localhost"
+rundeck_port: 4440
+rundeck_grails_url: "{{ rundeck_protocol }}://{{ rundeck_hostname }}:{{ rundeck_port }}"
+
+# Rundeck User & System Paths
+rundeck_user: "rundeck"
+rundeck_group: "rundeck"
+rundeck_ssh_key_dir: "/var/lib/rundeck/.ssh"
+rundeck_key_type: "ed25519"
+
+# Default Project Setup
+rundeck_default_project: "DockerJobs"
+rundeck_project_dir: "/var/lib/rundeck/projects/{{ rundeck_default_project }}"
+
+# Target Execution Node Details
+rundeck_target_node_name: "docker-execution-host"
+rundeck_target_node_ip: ""
+rundeck_target_node_user: "rundeck-runner"

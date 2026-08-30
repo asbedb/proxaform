@@ -1,0 +1,8 @@
+---
+- name: Deploy Rundeck Scheduler Control Plane
+  hosts: rundeck_node
+  become: yes
+  vars:
+      rundeck_port: 4440
+  roles:
+      - rundeck_server

@@ -1,0 +1,81 @@
+---
+# Ensure to read the ReadMe in the folder prior to running this playbook
+#
+# This play creates a rundeck project called DockerJobs and wires the docker host as an available node to execute commands against.
+
+- name: Register Docker Node as Rundeck Resource
+  hosts: rundeck_node
+  become: yes
+  vars:
+      rundeck_project_name: "DockerJobs"
+      rundeck_target_node_name: "docker-execution-host"
+      rundeck_target_node_user: "rundeck-runner"
+      rundeck_ssh_keypath: "/var/lib/rundeck/.ssh/id_ed25519"
+      rundeck_port: 4440
+      rundeck_server_ip: "{{ ansible_host | default(ansible_default_ipv4.address) }}"
+      rundeck_target_node_ip: "{{ hostvars[groups['docker_node'][0]]['ansible_host'] }}"
+  environment:
+      RD_URL: "http://{{ rundeck_server_ip }}:{{ rundeck_port }}"
+      RD_USER: admin
+      RD_PASSWORD: admin
+      RD_AUTH_PROMPT: "false"
+      RD_INSECURE_SSL: "true"
+  tasks:
+      - name: Fail fast if docker_node's IP can't be resolved from inventory
+        ansible.builtin.assert:
+            that:
+                - rundeck_target_node_ip is defined
+                - rundeck_target_node_ip | length > 0
+            fail_msg: >-
+                Could not resolve an IP for the docker_node host. Ensure
+                ansible_host is set in inventory for that group.
+            success_msg: "Docker node IP resolved to {{ rundeck_target_node_ip }}"
+      - name: Ensure Rundeck project exists
+        ansible.builtin.command:
+            cmd: "rd projects create -p {{ rundeck_project_name }}"
+        become_user: rundeck
+        register: rd_project_create
+        changed_when: "'Created project' in rd_project_create.stdout"
+        failed_when:
+            - rd_project_create.rc != 0
+            - "'already exists' not in rd_project_create.stderr | lower"
+            - "'already exists' not in rd_project_create.stdout | lower"
+      - name: Ensure project etc directory exists
+        ansible.builtin.file:
+            path: "/var/lib/rundeck/projects/{{ rundeck_project_name }}/etc"
+            state: directory
+            owner: rundeck
+            group: rundeck
+            mode: "0755"
+      - name: Write node resources file for the project
+        ansible.builtin.copy:
+            dest: "/var/lib/rundeck/projects/{{ rundeck_project_name }}/etc/resources.yaml"
+            owner: rundeck
+            group: rundeck
+            mode: "0644"
+            content: |
+                {{ rundeck_target_node_name }}:
+                  nodename: {{ rundeck_target_node_name }}
+                  hostname: {{ rundeck_target_node_ip }}
+                  username: {{ rundeck_target_node_user }}
+                  description: "Docker execution host"
+                  tags: "docker, executor"
+                  ssh-keypath: "{{ rundeck_ssh_keypath }}"
+                  ssh-authentication: "privateKey"
+      - name: Point project's resource source at the resources file
+        ansible.builtin.command:
+            cmd: >-
+                rd projects configure update -p {{ rundeck_project_name }} --
+                --resources.source.1.type=file
+                --resources.source.1.config.file=/var/lib/rundeck/projects/{{ rundeck_project_name }}/etc/resources.yaml
+                --resources.source.1.config.format=resourceyaml
+        become_user: rundeck
+        register: rd_config_set
+        changed_when: rd_config_set.rc == 0
+      - name: Confirm docker node is visible to the project
+        ansible.builtin.command:
+            cmd: "rd nodes list -p {{ rundeck_project_name }} --filter 'name: {{ rundeck_target_node_name }}'"
+        become_user: rundeck
+        register: rd_node_check
+        changed_when: false
+        failed_when: rundeck_target_node_name not in rd_node_check.stdout

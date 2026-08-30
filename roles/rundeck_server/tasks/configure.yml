@@ -1,0 +1,116 @@
+---
+- name: Resolve and validate target Rundeck IP binding
+  ansible.builtin.set_fact:
+      resolved_rundeck_ip: "{{ rundeck_server_ip | default(ansible_default_ipv4.address | default(ansible_host)) }}"
+
+- name: Validate target IP resolution is not localhost
+  ansible.builtin.assert:
+      that:
+          - resolved_rundeck_ip is defined
+          - resolved_rundeck_ip not in ['localhost', '127.0.0.1', '::1']
+      fail_msg: "Rundeck configuration failed: 'rundeck_server_ip' or a valid remote 'ansible_host' IP must be explicitly set."
+      success_msg: "Target Rundeck IP resolved to: {{ resolved_rundeck_ip }}"
+
+- name: Create SSH directory for Rundeck user
+  ansible.builtin.file:
+      path: "{{ rundeck_ssh_key_dir }}"
+      state: directory
+      owner: "{{ rundeck_user }}"
+      group: "{{ rundeck_group }}"
+      mode: "0700"
+
+- name: Generate SSH key pair for Rundeck runner execution
+  community.crypto.openssh_keypair:
+      path: "{{ rundeck_ssh_key_dir }}/id_{{ rundeck_key_type }}"
+      type: "{{ rundeck_key_type }}"
+      owner: "{{ rundeck_user }}"
+      group: "{{ rundeck_group }}"
+      mode: "0600"
+  register: rundeck_ssh_key
+
+- name: Set grails.serverURL in rundeck-config.properties
+  ansible.builtin.lineinfile:
+      path: /etc/rundeck/rundeck-config.properties
+      regexp: '^grails\.serverURL='
+      line: "grails.serverURL={{ rundeck_protocol }}://{{ resolved_rundeck_ip }}:{{ rundeck_port }}"
+      create: yes
+  notify: Restart Rundeck
+
+- name: Disable secure cookie enforcement on HTTP
+  ansible.builtin.lineinfile:
+      path: /etc/rundeck/rundeck-config.properties
+      regexp: '^server\.servlet\.session\.cookie\.secure='
+      line: "server.servlet.session.cookie.secure={{ 'true' if rundeck_protocol == 'https' else 'false' }}"
+      create: yes
+  notify: Restart Rundeck
+
+- name: Set framework.server.url in framework.properties
+  ansible.builtin.lineinfile:
+      path: /etc/rundeck/framework.properties
+      regexp: '^framework\.server\.url='
+      line: "framework.server.url={{ rundeck_protocol }}://{{ resolved_rundeck_ip }}:{{ rundeck_port }}"
+      create: yes
+  notify: Restart Rundeck
+
+- name: Set framework.server.name in framework.properties
+  ansible.builtin.lineinfile:
+      path: /etc/rundeck/framework.properties
+      regexp: '^framework\.server\.name='
+      line: "framework.server.name={{ resolved_rundeck_ip }}"
+      create: yes
+  notify: Restart Rundeck
+
+- name: Set framework.server.hostname in framework.properties
+  ansible.builtin.lineinfile:
+      path: /etc/rundeck/framework.properties
+      regexp: '^framework\.server\.hostname='
+      line: "framework.server.hostname={{ resolved_rundeck_ip }}"
+      create: yes
+  notify: Restart Rundeck
+
+- name: Set framework.server.port in framework.properties
+  ansible.builtin.lineinfile:
+      path: /etc/rundeck/framework.properties
+      regexp: '^framework\.server\.port='
+      line: "framework.server.port={{ rundeck_port }}"
+      create: yes
+  notify: Restart Rundeck
+
+# rd CLI reads its own config file directly, regardless of shell/session
+# mechanics — unlike /etc/environment, which PAM only loads at login and
+# which non-login `become_user` command tasks aren't guaranteed to source.
+#
+# NOTE FOR PRODUCTION USE: this hardcodes the Rundeck default admin/admin
+# credentials into a config file on disk. That's fine for an isolated,
+# non-networked homelab demo, but anyone adapting this for a real
+# deployment should swap this out for Ansible Vault (or a CI secret) and
+# ideally an API token (RD_TOKEN) instead of a username/password.
+- name: Ensure rd CLI config directory exists for rundeck user
+  ansible.builtin.file:
+      path: "/home/{{ rundeck_user }}/.rd"
+      state: directory
+      owner: "{{ rundeck_user }}"
+      group: "{{ rundeck_group }}"
+      mode: "0700"
+
+- name: Configure rd CLI default connection profile
+  ansible.builtin.copy:
+      dest: "/home/{{ rundeck_user }}/.rd/rd.conf"
+      owner: "{{ rundeck_user }}"
+      group: "{{ rundeck_group }}"
+      mode: "0600"
+      content: |
+          export RD_URL={{ rundeck_protocol }}://{{ resolved_rundeck_ip }}:{{ rundeck_port }}
+          export RD_USER=admin
+          export RD_PASSWORD=admin
+          export RD_AUTH_PROMPT=false
+          export RD_INSECURE_SSL={{ 'false' if rundeck_protocol == 'https' else 'true' }}
+
+- name: Ensure Rundeck service is started and enabled
+  ansible.builtin.systemd:
+      name: rundeckd
+      state: started
+      enabled: yes
+
+- name: Flush handlers to apply server properties
+  ansible.builtin.meta: flush_handlers

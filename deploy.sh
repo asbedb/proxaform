@@ -10,6 +10,7 @@ PLAYBOOK_DIR="playbooks"
 SECRETS_DIR="secrets"
 DEFAULT_TFVARS="${SECRETS_DIR}/terraform.tfvars"
 PUB_KEY_PATH="${SECRETS_DIR}/id_ed25519.pub"
+export ANSIBLE_CONFIG="$(pwd)/ansible.cfg"
 
 mkdir -p "$LOG_DIR"
 
@@ -69,7 +70,7 @@ echo "--> Selected playbook: ${PLAYBOOK_PATH}"
 
 CREATE_CUSTOM_TFVAR=false
 mkdir -p "$SECRETS_DIR"
-mapfile -t TFVARS < <(find "$SECRETS_DIR" -maxdepth 1 -type f -name "*.tfvars" | sort)
+mapfile -t TFVARS < <(find "$SECRETS_DIR" -type f -name "*.tfvars" | sort)
 
 if [ "${#TFVARS[@]}" -gt 0 ]; then
     echo "Found existing tfvar files in ${SECRETS_DIR}..."
@@ -108,6 +109,9 @@ if [ "$CREATE_CUSTOM_TFVAR" = true ]; then
     read -rp "Proxmox API URL with Port (example: https://192.168.0.5:8006/): " PROXMOX_API_URL_WITH_PORT
     read -rp "Container Network Bridge Name (example:vmbr0): " CONTAINER_NETWORK_BRIDGE_NAME
     read -rp "File Name (e.g. custom.tfvars): " FILE_NAME
+    read -rp "Dedicated RAM for the LXC container in MB: " DEDICATED_RAM
+    read -rp "Swap memory for the LXC container in MB: " SWAP_SIZE
+    read -rp "Number of CPU cores dedicated to the LXC container: " CONTAINER_CPU_CORES
     TARGET_FILE="${SECRETS_DIR}/${FILE_NAME}"
 
     cat <<EOF > "$TARGET_FILE"
@@ -133,6 +137,9 @@ proxmox_lxc_template_type       = "${PROXMOX_LXC_TEMPLATE_TYPE}"
 # Storage Settings
 disk_datastore_id               = "${DISK_DATASTORE_ID}"
 disk_size                       = ${DISK_SIZE}
+container_ram_mb                = ${DEDICATED_RAM}
+container_swap_mb               = ${SWAP_SIZE}
+container_cpu_cores             = ${CONTAINER_CPU_CORES}
 EOF
 
     echo "Successfully created ${TARGET_FILE}"
@@ -142,7 +149,7 @@ else
     echo "Available .tfvars files in '${SECRETS_DIR}/':"
     echo "------------------------------------------"
     for i in "${!TFVARS[@]}"; do
-        printf "  [%d] %s\n" "$((i+1))" "$(basename "${TFVARS[$i]}")"
+        printf "  [%d] %s\n" "$((i+1))" "${TFVARS[$i]}"
     done
     echo "------------------------------------------"
     while true; do
@@ -213,7 +220,7 @@ echo "------------------------------------------"
 
 while true; do
     echo ""
-    read -rp "Assign to an existing group [number], type a new group name, or press [Enter] to stick with default '${SELECTED_GROUPS[*]}': " GROUP_INPUT
+    read -rp "Assign to an existing group if available by entering the corresponding number, type a new group name, or press Enter to stick with default '${SELECTED_GROUPS[*]}': " GROUP_INPUT
 
     if [ -z "$GROUP_INPUT" ]; then
         break

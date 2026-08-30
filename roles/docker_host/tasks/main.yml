@@ -1,0 +1,64 @@
+---
+- name: Ensure target OS is Debian or Ubuntu
+  ansible.builtin.assert:
+      that:
+          - ansible_os_family == 'Debian'
+      fail_msg: "This role currently supports Debian/Ubuntu family targets."
+
+- name: Install prerequisite OS packages
+  ansible.builtin.apt:
+      name: "{{ docker_packages }}"
+      state: present
+      update_cache: yes
+
+- name: Create directory for Docker APT keyring
+  ansible.builtin.file:
+      path: /etc/apt/keyrings
+      state: directory
+      mode: "0755"
+
+- name: Download Docker official GPG key
+  ansible.builtin.get_url:
+      url: "{{ docker_gpg_url }}"
+      dest: "{{ docker_gpg_keyring }}"
+      mode: "0644"
+      force: no
+
+- name: Add Docker APT repository (deb822 format)
+  ansible.builtin.deb822_repository:
+      name: docker
+      types: [deb]
+      uris: "https://download.docker.com/linux/{{ ansible_facts['distribution'] | lower }}"
+      suites: ["{{ ansible_facts['distribution_release'] }}"]
+      components: [stable]
+      signed_by: "{{ docker_gpg_keyring }}"
+      install_python_debian: true
+      state: present
+
+- name: Install Docker Engine and Plugins
+  ansible.builtin.apt:
+      name: "{{ docker_engine_packages }}"
+      state: present
+      update_cache: yes
+  notify: Restart Docker
+
+- name: Ensure Docker service is enabled and started
+  ansible.builtin.service:
+      name: docker
+      state: started
+      enabled: yes
+
+- name: Create dedicated runner user for automation
+  ansible.builtin.user:
+      name: "{{ docker_runner_user }}"
+      groups: "{{ docker_runner_group }}"
+      append: yes
+      shell: "{{ docker_runner_shell }}"
+      create_home: yes
+
+- name: Deploy SSH public key for runner user (if provided)
+  ansible.posix.authorized_key:
+      user: "{{ docker_runner_user }}"
+      state: present
+      key: "{{ docker_runner_ssh_key }}"
+  when: docker_runner_ssh_key | length > 0

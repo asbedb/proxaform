@@ -82,3 +82,20 @@ variable "container_root_password" {
   type        = string
   sensitive   = true
 }
+variable "container_ram_mb" {
+  description = "Dedicated RAM for the LXC container in MB"
+  type        = number
+  default     = 2048 
+}
+
+variable "container_swap_mb" {
+  description = "Swap memory for the LXC container in MB"
+  type        = number
+  default     = 512
+}
+
+variable "container_cpu_cores" {
+  description = "Number of CPU cores dedicated to the LXC container"
+  type        = number
+  default     = 2
+}
