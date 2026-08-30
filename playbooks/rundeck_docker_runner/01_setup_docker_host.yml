@@ -1,0 +1,12 @@
+---
+- name: Deploy Docker Host Engine and Portainer Server
+  hosts: docker_node
+  become: yes
+
+  vars:
+      portainer_https_port: 9443
+      portainer_http_port: 9000
+
+  roles:
+      - docker_host
+      - portainer_server

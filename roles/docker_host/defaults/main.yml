@@ -1,0 +1,29 @@
+---
+# Package management defaults
+docker_packages:
+    - apt-transport-https
+    - ca-certificates
+    - curl
+    - gnupg
+    - lsb-release
+    - python3-pip
+
+docker_engine_packages:
+    - docker-ce
+    - docker-ce-cli
+    - containerd.io
+    - docker-buildx-plugin
+    - docker-compose-plugin
+
+# Docker GPG and Repo settings
+docker_gpg_url: "https://download.docker.com/linux/ubuntu/gpg"
+docker_gpg_keyring: "/etc/apt/keyrings/docker.asc"
+docker_repo_url: "https://download.docker.com/linux/ubuntu"
+
+# Automation runner user configuration
+docker_runner_user: "rundeck-runner"
+docker_runner_group: "docker"
+docker_runner_shell: "/bin/bash"
+
+# Optional: Set SSH Public key variable (can be passed via playbook)
+docker_runner_ssh_key: ""

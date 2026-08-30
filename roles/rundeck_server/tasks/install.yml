@@ -1,0 +1,32 @@
+---
+- name: Install Java runtime and dependencies
+  ansible.builtin.apt:
+      name:
+          - "{{ rundeck_java_package }}"
+          - apt-transport-https
+          - curl
+          - gnupg
+          - openssh-client
+      state: present
+      update_cache: yes
+
+- name: Add Rundeck official GPG signing key
+  ansible.builtin.get_url:
+      url: "https://packages.rundeck.com/pagerduty/rundeck/gpgkey"
+      dest: "/etc/apt/trusted.gpg.d/rundeck.asc"
+      mode: "0644"
+
+- name: Add Rundeck official APT repository
+  ansible.builtin.apt_repository:
+      repo: "deb https://packages.rundeck.com/pagerduty/rundeck/any/ any main"
+      state: present
+      filename: rundeck
+
+- name: Install Rundeck and Rundeck CLI packages
+  ansible.builtin.apt:
+      name:
+          - rundeck
+          - rundeck-cli
+      state: present
+      update_cache: yes
+  notify: Restart Rundeck

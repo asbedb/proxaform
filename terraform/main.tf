@@ -18,21 +18,29 @@ resource "proxmox_virtual_environment_container" "ubuntu_container" {
   node_name    = var.proxmox_root_node_name
   vm_id        = var.vm_id
   unprivileged = true
+
   features {
     nesting = true
   }
+
   initialization {
     hostname = var.container_name
+
     user_account {
       password = var.container_root_password
       keys     = [var.authorised_ssh_key]
     }
+    
     ip_config {
       ipv4 {
         address = var.container_ipv4_address_cidr
         gateway = var.container_ipv4_gateway
       }
     }
+  }
+
+  cpu {
+    cores = var.container_cpu_cores
   }
 
   network_interface {
@@ -48,5 +56,10 @@ resource "proxmox_virtual_environment_container" "ubuntu_container" {
   disk {
     datastore_id = var.disk_datastore_id
     size         = var.disk_size
+  }
+
+  memory {
+    dedicated = var.container_ram_mb
+    swap      = var.container_swap_mb 
   }
 }

@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project>
+  <!-- Local Rundeck Master Node -->
+  <node name="rundeck-server"
+        description="Rundeck Master Controller"
+        tags="rundeck,local"
+        hostname="{{ resolved_rundeck_ip }}"
+        osArch="amd64"
+        osFamily="unix"
+        osName="Linux"
+        username="{{ rundeck_user | default('rundeck') }}"/>
+
+  <!-- Dedicated Target Docker Execution Node -->
+  <node name="{{ rundeck_target_node_name | default('docker-execution-host') }}"
+        description="Dedicated Docker Execution Environment"
+        tags="docker,executor"
+        hostname="{{ rundeck_target_node_ip }}"
+        osArch="amd64"
+        osFamily="unix"
+        osName="Linux"
+        username="{{ rundeck_target_node_user | default('rundeck-runner') }}"
+        ssh-authentication="privateKey"
+        ssh-key-path="{{ rundeck_ssh_key_dir }}/id_{{ rundeck_key_type }}"
+        node-executor="jsch-ssh"
+        file-copier="jsch-scp"/>
+</project>

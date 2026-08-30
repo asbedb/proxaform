@@ -1,7 +1,7 @@
 ---
 galaxy_info:
     author: Proxaform Orchestrator
-    description: Baseline utility setup for generic Linux nodes
+    description: Installs Rundeck control plane
     license: MIT
     min_ansible_version: "2.12"
     platforms:
@@ -12,7 +12,6 @@ galaxy_info:
               - noble
         - name: Debian
           versions:
-              - bullseye
               - bookworm
 
 dependencies: []

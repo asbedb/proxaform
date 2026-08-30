@@ -35,7 +35,7 @@ fi
 SSH_PUBLIC_KEY=$(cat "$PUB_KEY_PATH")
 
 mkdir -p "$SECRETS_DIR"
-mapfile -t TFSTATES < <(find "$SECRETS_DIR" -maxdepth 1 -type f -name "*.tfstate" | sort)
+mapfile -t TFSTATES < <(find "$SECRETS_DIR" -type f -name "*.tfstate" | sort)
 
 if [ "${#TFSTATES[@]}" -eq 0 ]; then
     echo "ERROR: No .tfstate files found in '${SECRETS_DIR}/'."
@@ -46,7 +46,7 @@ fi
 echo "Available .tfstate targets in '${SECRETS_DIR}/':"
 echo "------------------------------------------"
 for i in "${!TFSTATES[@]}"; do
-    printf "  [%d] %s\n" "$((i+1))" "$(basename "${TFSTATES[$i]}")"
+    printf "  [%d] %s\n" "$((i+1))" "${TFSTATES[$i]}"
 done
 echo "------------------------------------------"
 

@@ -1,0 +1,18 @@
+---
+# Portainer Container Image Settings
+portainer_image: "portainer/portainer-ce:latest"
+portainer_container_name: "portainer"
+
+# Port Bindings
+portainer_http_port: 9000
+portainer_https_port: 9443
+portainer_edge_port: 8000
+
+# Volume Settings
+portainer_volume_name: "portainer_data"
+
+# Docker Socket Location
+portainer_docker_socket: "/var/run/docker.sock"
+
+# Force restart option
+portainer_restart_policy: "always"

@@ -1,0 +1,42 @@
+---
+- name: Ensure Python Docker SDK is installed
+  ansible.builtin.pip:
+      name: docker
+      state: present
+  register: python_docker_install
+  failed_when: false
+
+# Fallback for systems using OS-managed python packages
+- name: Ensure python3-docker system package is present
+  ansible.builtin.apt:
+      name: python3-docker
+      state: present
+  when: python_docker_install is failed
+
+- name: Ensure Python dependencies for Docker modules are installed
+  ansible.builtin.apt:
+      name:
+          - python3-requests
+          - python3-docker
+      state: present
+      update_cache: yes
+
+- name: Create persistent Docker volume for Portainer data
+  community.docker.docker_volume:
+      name: "{{ portainer_volume_name }}"
+      state: present
+
+- name: Deploy Portainer Server container
+  community.docker.docker_container:
+      name: "{{ portainer_container_name }}"
+      image: "{{ portainer_image }}"
+      state: started
+      restart_policy: "{{ portainer_restart_policy }}"
+      published_ports:
+          - "{{ portainer_http_port }}:9000"
+          - "{{ portainer_https_port }}:9443"
+          - "{{ portainer_edge_port }}:8000"
+      volumes:
+          - "{{ portainer_docker_socket }}:/var/run/docker.sock"
+          - "{{ portainer_volume_name }}:/data"
+  notify: Restart Portainer

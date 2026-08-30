@@ -1,0 +1,6 @@
+---
+- name: Include OS validation and package installation
+  ansible.builtin.include_tasks: install.yml
+
+- name: Include Rundeck service configuration and key generation
+  ansible.builtin.include_tasks: configure.yml
