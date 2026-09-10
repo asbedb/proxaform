@@ -1,0 +1,5 @@
+---
+- name: Restart crontab-ui
+  ansible.builtin.systemd:
+      name: crontab-ui
+      state: restarted

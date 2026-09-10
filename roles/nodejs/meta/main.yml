@@ -1,0 +1,17 @@
+---
+galaxy_info:
+    author: Proxaform Orchestrator
+    description: Sets up nodejs using Node Version Manager (NVM).
+    license: MIT
+    min_ansible_version: "2.12"
+    platforms:
+        - name: Ubuntu
+          versions:
+              - focal
+              - jammy
+              - noble
+        - name: Debian
+          versions:
+              - bookworm
+
+dependencies: []

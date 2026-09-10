@@ -22,4 +22,4 @@ rundeck_project_dir: "/var/lib/rundeck/projects/{{ rundeck_default_project }}"
 # Target Execution Node Details
 rundeck_target_node_name: "docker-execution-host"
 rundeck_target_node_ip: ""
-rundeck_target_node_user: "rundeck-runner"
+rundeck_target_node_user: "docker-runner"

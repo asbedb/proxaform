@@ -17,10 +17,14 @@
       mode: "0644"
 
 - name: Add Rundeck official APT repository
-  ansible.builtin.apt_repository:
-      repo: "deb https://packages.rundeck.com/pagerduty/rundeck/any/ any main"
+  ansible.builtin.deb822_repository:
+      name: rundeck
+      types: deb
+      uris: "https://packages.rundeck.com/pagerduty/rundeck/any/"
+      suites: any
+      components: main
       state: present
-      filename: rundeck
+      install_python_debian: true
 
 - name: Install Rundeck and Rundeck CLI packages
   ansible.builtin.apt:

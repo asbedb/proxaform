@@ -1,0 +1,28 @@
+[Unit]
+Description=Crontab UI Service
+After=network.target
+
+[Service]
+Type=simple
+User=root
+Environment="PATH={{ crontab_ui_binary.stdout | dirname }}:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+Environment="HOST={{ host }}"
+Environment="PORT={{ port }}"
+{% if base_url is defined and base_url | length > 0 %}
+Environment="BASE_URL={{ base_url }}"
+{% endif %}
+Environment="CRON_DB_PATH={{ cron_db_path }}"
+Environment="BASIC_AUTH_USER={{ basic_auth_user }}"
+Environment="BASIC_AUTH_PWD={{ basic_auth_pwd }}"
+Environment="ENABLE_AUTOSAVE={{ enable_autosave | lower }}"
+{% if ssl_cert_path is defined and ssl_cert_path | length > 0 %}
+Environment="SSL_CERT_PATH={{ ssl_cert_path }}"
+{% endif %}
+{% if ssl_key_path is defined and ssl_key_path | length > 0 %}
+Environment="SSL_KEY_PATH={{ ssl_key_path }}"
+{% endif %}
+ExecStart={{ crontab_ui_binary.stdout }}
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

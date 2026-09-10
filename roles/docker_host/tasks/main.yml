@@ -2,7 +2,7 @@
 - name: Ensure target OS is Debian or Ubuntu
   ansible.builtin.assert:
       that:
-          - ansible_os_family == 'Debian'
+          - ansible_facts['os_family'] == "Debian"
       fail_msg: "This role currently supports Debian/Ubuntu family targets."
 
 - name: Install prerequisite OS packages
@@ -56,9 +56,19 @@
       shell: "{{ docker_runner_shell }}"
       create_home: yes
 
+- name: Ensure SSH directory exists for runner user with strict permissions
+  ansible.builtin.file:
+      path: "/home/{{ docker_runner_user }}/.ssh"
+      state: directory
+      owner: "{{ docker_runner_user }}"
+      group: "{{ docker_runner_user }}"
+      mode: "0700"
+
 - name: Deploy SSH public key for runner user (if provided)
   ansible.posix.authorized_key:
       user: "{{ docker_runner_user }}"
       state: present
-      key: "{{ docker_runner_ssh_key }}"
-  when: docker_runner_ssh_key | length > 0
+      key: "{{ docker_runner_ssh_key if not (docker_runner_ssh_key | regex_search('^/')) else lookup('file', docker_runner_ssh_key) }}"
+  when:
+      - docker_runner_ssh_key is defined
+      - docker_runner_ssh_key | length > 0

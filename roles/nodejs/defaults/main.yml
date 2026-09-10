@@ -1,0 +1,5 @@
+---
+node_version: 26
+nvm_url: "https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.7/install.sh"
+package_manager: pnpm
+global_packages: []
