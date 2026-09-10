@@ -1,23 +1,9 @@
----
-- name: Ensure Python Docker SDK is installed
-  ansible.builtin.pip:
-      name: docker
-      state: present
-  register: python_docker_install
-  failed_when: false
-
-# Fallback for systems using OS-managed python packages
-- name: Ensure python3-docker system package is present
-  ansible.builtin.apt:
-      name: python3-docker
-      state: present
-  when: python_docker_install is failed
-
 - name: Ensure Python dependencies for Docker modules are installed
   ansible.builtin.apt:
       name:
           - python3-requests
           - python3-docker
+          - python3-passlib
       state: present
       update_cache: yes
 
@@ -32,6 +18,7 @@
       image: "{{ portainer_image }}"
       state: started
       restart_policy: "{{ portainer_restart_policy }}"
+      command: --admin-password="{{ (portainer_admin_password | default('ChangeMe12345678!')) | password_hash('bcrypt') }}"
       published_ports:
           - "{{ portainer_http_port }}:9000"
           - "{{ portainer_https_port }}:9443"
@@ -39,4 +26,27 @@
       volumes:
           - "{{ portainer_docker_socket }}:/var/run/docker.sock"
           - "{{ portainer_volume_name }}:/data"
-  notify: Restart Portainer
+
+- name: Resolve Portainer IP
+  ansible.builtin.set_fact:
+      resolved_ip: "{{ ansible_facts.default_ipv4.address }}"
+
+- name: Wait for Portainer web service to become active
+  ansible.builtin.uri:
+      url: "https://127.0.0.1:{{ portainer_https_port }}"
+      status_code: [200, 401, 302]
+      validate_certs: false
+  register: portainer_health
+  until: portainer_health.status in [200, 401, 302]
+  retries: 10
+  delay: 3
+
+- name: Display deployment access details
+  ansible.builtin.debug:
+      msg:
+          - "--------------------------------------------------------"
+          - "Portainer installed successfully!"
+          - "Status Code: {{ portainer_health.status }}"
+          - "Access URL:  https://{{ resolved_ip }}:{{ portainer_https_port }}"
+          - "Admin User:  {{ portainer_admin_username | default('admin') }}"
+          - "--------------------------------------------------------"

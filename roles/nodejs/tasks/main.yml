@@ -1,0 +1,71 @@
+---
+- name: Download NVM installer
+  ansible.builtin.get_url:
+      url: "{{ nvm_url }}"
+      dest: /tmp/nvm_install.sh
+      mode: "0755"
+
+- name: Execute NVM installer script
+  ansible.builtin.command: /tmp/nvm_install.sh
+  args:
+      creates: "{{ ansible_facts['user_dir'] }}/.nvm/nvm.sh"
+
+- name: Install Node.js version {{ node_version }} via NVM
+  ansible.builtin.shell: |
+      export NVM_DIR="{{ ansible_facts['user_dir'] }}/.nvm"
+      [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+      nvm install {{ node_version }}
+
+      # Resolve exact version string (e.g. v26.8.2) for the alias
+      RESOLVED_NODE_VER=$(nvm version {{ node_version }})
+      nvm alias default "$RESOLVED_NODE_VER"
+      nvm use default
+  args:
+      executable: /bin/bash
+  register: nvm_install_result
+  changed_when: "'is already installed' not in nvm_install_result.stderr"
+
+- name: Enable Corepack for managed package managers (pnpm / yarn)
+  ansible.builtin.shell: |
+      export NVM_DIR="{{ ansible_facts['user_dir'] }}/.nvm"
+      [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+      nvm use default
+      npm install -g corepack
+
+      # Disable interactive prompts and pre-fetch package manager
+      export COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+      corepack enable {{ package_manager }}
+      corepack prepare {{ package_manager }}@latest --activate
+  args:
+      executable: /bin/bash
+  when: package_manager in ['pnpm', 'yarn']
+  register: corepack_result
+  changed_when: "'changed' in corepack_result.stdout or corepack_result.rc == 0"
+
+- name: Install additional global packages
+  ansible.builtin.shell: |
+      export NVM_DIR="{{ ansible_facts['user_dir'] }}/.nvm"
+      [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+      nvm use default
+      npm install -g {{ item }}
+  args:
+      executable: /bin/bash
+  loop: "{{ global_packages }}"
+  when: global_packages | length > 0
+
+- name: Verify installed runtime and package manager versions
+  ansible.builtin.shell: |
+      export NVM_DIR="{{ ansible_facts['user_dir'] }}/.nvm"
+      [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+      nvm use default
+      export COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+      echo "Node version: $(node -v)"
+      echo "{{ package_manager }} version: $({{ package_manager }} -v)"
+  args:
+      executable: /bin/bash
+  register: verify_output
+  changed_when: false
+
+- name: Display runtime environment versions
+  ansible.builtin.debug:
+      var: verify_output.stdout_lines

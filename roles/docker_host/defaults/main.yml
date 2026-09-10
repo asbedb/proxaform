@@ -21,7 +21,7 @@ docker_gpg_keyring: "/etc/apt/keyrings/docker.asc"
 docker_repo_url: "https://download.docker.com/linux/ubuntu"
 
 # Automation runner user configuration
-docker_runner_user: "rundeck-runner"
+docker_runner_user: "docker-runner"
 docker_runner_group: "docker"
 docker_runner_shell: "/bin/bash"
 

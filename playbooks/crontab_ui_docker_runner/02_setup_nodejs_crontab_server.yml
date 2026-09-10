@@ -1,0 +1,13 @@
+---
+- name: Installs NodeJS and Crontab-Ui
+  hosts: crontab_node
+  become: yes
+
+  vars:
+      node_version: 26
+      package_manager: pnpm
+
+  roles:
+      - common
+      - nodejs
+      - crontab-ui

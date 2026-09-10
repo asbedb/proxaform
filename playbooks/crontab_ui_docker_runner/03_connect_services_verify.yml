@@ -1,0 +1,31 @@
+---
+- name: Configure SSH Trust on Docker Node
+  hosts: docker_node
+  become: yes
+  tasks:
+      - name: Slurp crontab public key from crontab server
+        ansible.builtin.slurp:
+            src: "/var/lib/crontab/.ssh/id_ed25519.pub"
+        delegate_to: "{{ groups['crontab_node'][0] }}"
+        register: crontab_pub_key
+
+      - name: Ensure authorized_keys contains crontab public key
+        ansible.posix.authorized_key:
+            user: "docker-runner"
+            state: present
+            key: "{{ crontab_pub_key.content | b64decode }}"
+
+- name: Test SSH from Crontab host to Docker node
+  hosts: crontab_node
+  become: yes
+  become_user: crontab
+  tasks:
+      - name: Test SSH connection to Docker node
+        ansible.builtin.command:
+            cmd: "ssh -i /var/lib/crontab/.ssh/id_ed25519 -o BatchMode=yes -o StrictHostKeyChecking=accept-new docker-runner@{{ hostvars[groups['docker_node'][0]]['ansible_host'] | default(hostvars[groups['docker_node'][0]]['ansible_facts']['default_ipv4']['address']) }} 'echo Connection successful!'"
+        register: ssh_test
+        changed_when: false
+
+      - name: Display SSH test result
+        ansible.builtin.debug:
+            msg: "{{ ssh_test.stdout }}"

@@ -1,103 +1,80 @@
 # Rundeck Docker Runner
 
-Provisions a two-node homelab stack: a Docker execution host and a Rundeck control plane, then wire them together so Rundeck can dispatch jobs to the Docker host.
+Provisions a two-node homelab stack: a Docker execution host and a Rundeck control plane, wired together so Rundeck can manage, schedule, and dispatch jobs to the Docker host over SSH.
+
+---
 
 ## Architecture
 
-| Node | Inventory group | Role                                                              |
-| ---- | --------------- | ----------------------------------------------------------------- |
-| VM 1 | `docker_node`   | Runs Docker + Portainer; executes jobs dispatched from Rundeck    |
-| VM 2 | `rundeck_node`  | Runs the Rundeck server + `rd` CLI; schedules and dispatches jobs |
-
-## Two ways to run each step
-
-Every step below can be run one of two ways:
-
-- **`./deploy.sh <playbook>`** — the bootstrapper. Provisions the underlying VM/infra first, then runs the given playbook against it. Use this for a clean environment where the VM doesn't exist yet.
-- **`ansible-playbook -i inventory/hosts.yml <playbook>`** — runs the playbook only, against a host that's already provisioned and present in inventory. Use this to re-run configuration, pick up changes, or target a VM you built some other way.
-
-Both end up running the exact same playbook — `deploy.sh` just does infra provisioning as an extra step beforehand.
+| Node     | Inventory Group | Role & Services                                                         |
+| -------- | --------------- | ----------------------------------------------------------------------- |
+| **VM 1** | `docker_node`   | Runs Docker & Portainer; executes jobs dispatched from Rundeck          |
+| **VM 2** | `rundeck_node`  | Runs Rundeck server & `rd` CLI; schedules, manages, and dispatches jobs |
 
 ---
 
-## 1. Provision & Configure Docker Host (VM 1)
+## Deployment Workflows
 
-Installs Docker, creates the `rundeck-runner` execution user, and deploys
-Portainer for container management.
+Every step can be run using one of two methods:
+
+- **Bootstrapper (`./deploy.sh <playbook>`)**
+  Provisions the target VM/infrastructure first, then executes the playbook. Use this for fresh environments where the VM does not yet exist.
+- **Direct Ansible (`ansible-playbook -i inventory/hosts.yml <playbook>`)**
+  Executes only the configuration playbook against pre-existing infrastructure.
+
+> **Prerequisite:** Update `inventory/hosts.yml` with your target IP addresses before running any playbooks.
+
+---
+
+## Deployment Steps
+
+### Step 1: Provision & Configure Docker Host (VM 1)
+
+Installs Docker Engine, creates the `rundeck-runner` execution user, and deploys Portainer.
 
 ```bash
-# Bootstrapper: provisions the VM, then configures it
+# Option A: Provision VM + Configure
 ./deploy.sh playbooks/rundeck_docker_runner/01_setup_docker_host.yml
 
-# Playbook only: configures an already-provisioned host
+# Option B: Playbook only (existing VM)
 ANSIBLE_CONFIG=./ansible.cfg ansible-playbook -i inventory/hosts.yml playbooks/rundeck_docker_runner/01_setup_docker_host.yml
+
 ```
 
-> **Before running:** add this VM's IP to the `docker_node` group in
-> `inventory/hosts.yml`.
+### Step 2: Provision & Configure Rundeck Control Plane (VM 2)
 
----
-
-## 2. Provision & Configure Rundeck Control Plane (VM 2)
-
-Installs Rundeck and the `rd` CLI, generates the SSH keypair Rundeck will use
-to reach the Docker host, and configures the Rundeck server's own
-URL/hostname bindings.
+Installs Rundeck and the `rd` CLI tool, generates the dedicated SSH keypair, and configures Rundeck server URL/hostname bindings.
 
 ```bash
-# Bootstrapper: provisions the VM, then configures it
+# Option A: Provision VM + Configure
 ./deploy.sh playbooks/rundeck_docker_runner/02_setup_rundeck_server.yml
 
-# Playbook only: configures an already-provisioned host
+# Option B: Playbook only (existing VM)
 ANSIBLE_CONFIG=./ansible.cfg ansible-playbook -i inventory/hosts.yml playbooks/rundeck_docker_runner/02_setup_rundeck_server.yml
+
 ```
 
-> **Before running:** add this VM's IP to the `rundeck_node` group in
-> `inventory/hosts.yml`.
->
-> **Minimum recommended image specs:** 2 GB RAM, 2 CPU cores.
+> **Recommended VM Specs:** 2 CPU cores, 2 GB RAM.
 
----
+### Step 3: Authorize SSH Keys, Register Node & Verify Stack
 
-## 3. Authorize SSH Keys, Register Node, and Verify Full Stack
-
-Connects the two nodes together inside Rundeck:
-
-- Authorizes the Rundeck server's SSH public key on the Docker host
-- Creates the Rundeck project
-- Registers the Docker host as a node resource so it can be targeted by jobs
-- Confirms the node is visible in Rundeck's inventory
+Establishes passwordless SSH trust, creates the initial Rundeck project, registers the Docker host as a managed node resource, and verifies inventory visibility.
 
 ```bash
 ANSIBLE_CONFIG=./ansible.cfg ansible-playbook -i inventory/hosts.yml playbooks/rundeck_docker_runner/03_connect_services_verify.yml
-```
 
-This step only runs as a playbook (no `deploy.sh` variant) — it doesn't
-provision any infrastructure, it just wires together the two nodes from
-steps 1 and 2, which must already exist.
-
----
-
-## 4. Access the Stack
-
-| Service   | URL                                | Notes                                                                                                                   |
-| --------- | ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| Rundeck   | `http://<rundeck_server_ip>:4440/` | Use **HTTP**, not HTTPS. Default login: `admin` / `admin`. Can take up to ~50 seconds to become available after step 2. |
-| Portainer | `https://<docker_server_ip>:9443`  | Create your admin user on first login.                                                                                  |
-
-**Retrieving the Portainer setup token:** if you miss the first-login window,
-access the Docker host's CLI (e.g. via the Proxmox console) and run:
-
-```bash
-docker logs portainer 2>&1 | grep -i "token"
 ```
 
 ---
 
-## Security Note
+## Service Access & Endpoints
 
-This setup hardcodes the Rundeck default `admin`/`admin` credentials for
-convenience, on the assumption this is run in an isolated, non-networked
-homelab environment. **If adapting this for anything internet-facing or
-production, replace these with Ansible Vault–encrypted credentials (or an
-API token) before deploying.**
+| Service       | Protocol / URL                     | Default Credentials | Notes                                                       |
+| ------------- | ---------------------------------- | ------------------- | ----------------------------------------------------------- |
+| **Rundeck**   | `http://<rundeck_server_ip>:4440/` | `admin` / `admin`   | Use **HTTP**. Can take ~50s to become available after setup |
+| **Portainer** | `https://<docker_server_ip>:9443`  | `admin` / `admin`   | Self-signed SSL certificate                                 |
+
+---
+
+> **Security Warning**
+> This setup hardcodes default `admin` / `admin` credentials and unencrypted HTTP communication for convenience in an isolated homelab setting. **Do not expose this stack directly to the internet.** Use Ansible Vault for secrets and configure a reverse proxy with TLS termination for production use.

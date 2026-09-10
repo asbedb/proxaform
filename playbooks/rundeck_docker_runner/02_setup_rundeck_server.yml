@@ -5,4 +5,5 @@
   vars:
       rundeck_port: 4440
   roles:
+      - common
       - rundeck_server

@@ -1,0 +1,123 @@
+---
+- name: Ensure crontab group exists
+  ansible.builtin.group:
+      name: "{{ crontab_group | default('crontab') }}"
+      state: present
+
+- name: Ensure crontab user exists
+  ansible.builtin.user:
+      name: "{{ crontab_user | default('crontab') }}"
+      group: "{{ crontab_group | default('crontab') }}"
+      home: /var/lib/crontab
+      shell: /bin/bash
+      system: true
+      state: present
+
+- name: Create SSH directory for crontab user
+  ansible.builtin.file:
+      path: "{{ crontab_ssh_key_dir }}"
+      state: directory
+      owner: "{{ crontab_user | default('crontab') }}"
+      group: "{{ crontab_group | default('crontab') }}"
+      mode: "0700"
+
+- name: Ensure crontab home directory exists with correct ownership
+  ansible.builtin.file:
+      path: /var/lib/crontab
+      state: directory
+      owner: crontab
+      group: crontab
+      mode: "0755"
+
+- name: Ensure Ansible remote_tmp directory exists for crontab user
+  ansible.builtin.file:
+      path: /var/lib/crontab/.ansible/tmp
+      state: directory
+      owner: crontab
+      group: crontab
+      mode: "0755"
+      recurse: yes
+
+- name: Generate SSH key pair for crontab runner execution
+  community.crypto.openssh_keypair:
+      path: "{{ crontab_ssh_key_dir }}/id_{{ crontab_key_type }}"
+      type: "{{ crontab_key_type }}"
+      owner: "{{ crontab_user | default('crontab') }}"
+      group: "{{ crontab_group | default('crontab') }}"
+      mode: "0600"
+  register: crontab_ssh_key
+
+- name: Verify Node.js and npm availability via NVM
+  ansible.builtin.shell:
+      cmd: |
+          export NVM_DIR="$HOME/.nvm"
+          [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+          node -v
+      executable: /bin/bash
+  changed_when: false
+
+- name: Install crontab-ui globally via NVM's npm
+  ansible.builtin.shell:
+      cmd: |
+          export NVM_DIR="$HOME/.nvm"
+          [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+          npm install -g crontab-ui
+      executable: /bin/bash
+  register: npm_install
+  changed_when: "'added' in npm_install.stdout or 'changed' in npm_install.stdout"
+
+- name: Resolve binary path for crontab-ui
+  ansible.builtin.shell:
+      cmd: |
+          export NVM_DIR="$HOME/.nvm"
+          [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+          which crontab-ui
+      executable: /bin/bash
+  register: crontab_ui_binary
+  changed_when: false
+
+- name: Ensure crontab-ui database and log directories exist
+  ansible.builtin.file:
+      path: "{{ cron_db_path }}/logs"
+      state: directory
+      owner: root
+      group: root
+      mode: "0755"
+
+# 3. Service Configuration & Startup
+- name: Create systemd service unit for crontab-ui
+  ansible.builtin.template:
+      src: crontab-ui.service.j2
+      dest: /etc/systemd/system/crontab-ui.service
+      owner: root
+      group: root
+      mode: "0644"
+  notify: Restart crontab-ui
+
+- name: Flush handlers to force service restart before verification
+  ansible.builtin.meta: flush_handlers
+
+- name: Ensure crontab-ui service is started and enabled
+  ansible.builtin.systemd:
+      name: crontab-ui
+      state: started
+      enabled: true
+      daemon_reload: true
+
+- name: Wait for crontab-ui web service to become active
+  ansible.builtin.uri:
+      url: "http://127.0.0.1:{{ port }}"
+      status_code: [200, 401]
+  register: crontab_ui_health
+  until: crontab_ui_health.status in [200, 401]
+  retries: 5
+  delay: 2
+
+- name: Display deployment access details
+  ansible.builtin.debug:
+      msg:
+          - "--------------------------------------------------------"
+          - "crontab-ui successfully deployed and verified!"
+          - "Status Code: {{ crontab_ui_health.status }}"
+          - "Access URL:  http://{{ ansible_facts['default_ipv4']['address'] }}:{{ port }}{{ base_url }}"
+          - "--------------------------------------------------------"

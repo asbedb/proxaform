@@ -1,0 +1,17 @@
+- name: Wait for rundeck web service to become active
+  ansible.builtin.uri:
+      url: "http://127.0.0.1:{{ rundeck_port }}"
+      status_code: [200, 401]
+  register: rundeck_health
+  until: rundeck_health.status in [200, 401]
+  retries: 5
+  delay: 2
+
+- name: Display deployment access details
+  ansible.builtin.debug:
+      msg:
+          - "--------------------------------------------------------"
+          - "Rundeck installed!"
+          - "Status Code: {{ rundeck_health.status }}"
+          - "Access URL:  http://{{ resolved_rundeck_ip }}:{{ rundeck_port }}"
+          - "--------------------------------------------------------"

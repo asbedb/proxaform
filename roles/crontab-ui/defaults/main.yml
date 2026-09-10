@@ -1,0 +1,16 @@
+#SPDX-License-Identifier: MIT-0
+---
+host: "0.0.0.0"
+port: 9000
+base_urlL: ""
+cron_db_path: "/root/.cron/crontab-ui"
+basic_auth_user: "admin"
+basic_auth_pwd: "Password"
+ssl_cert_path: ""
+ssl_key_path: ""
+enable_autosave: false
+
+crontab_user: "crontab"
+crontab_group: "crontab"
+crontab_ssh_key_dir: "/var/lib/crontab/.ssh"
+crontab_key_type: "ed25519"

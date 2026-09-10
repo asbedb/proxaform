@@ -16,3 +16,7 @@ portainer_docker_socket: "/var/run/docker.sock"
 
 # Force restart option
 portainer_restart_policy: "always"
+
+# Default credentials
+portainer_admin_username: "admin"
+portainer_admin_password: "admin"

@@ -15,8 +15,12 @@ common_os_packages:
     Debian:
         - build-essential
         - software-properties-common
+        - libatomic1
     RedHat:
         - epel-release
+        - libatomic
+        - make
+        - gcc-c++
 
 common_ntp_servers:
     - 0.pool.ntp.org

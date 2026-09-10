@@ -29,7 +29,7 @@ All variables below are expected in `defaults/main.yml`.
 | `docker_gpg_url`         | URL Docker's official GPG signing key is downloaded from                                                                                                                            |
 | `docker_gpg_keyring`     | Path the downloaded GPG key is stored at (referenced by `signed_by` in the APT repo definition), e.g. `/etc/apt/keyrings/docker.gpg`                                                |
 | `docker_engine_packages` | List of Docker packages installed (e.g. `docker-ce`, `docker-ce-cli`, `containerd.io`, `docker-buildx-plugin`, `docker-compose-plugin`)                                             |
-| `docker_runner_user`     | System user created for running dispatched jobs (e.g. `rundeck-runner`)                                                                                                             |
+| `docker_runner_user`     | System user created for running dispatched jobs (e.g. `docker-runner`)                                                                                                              |
 | `docker_runner_group`    | Group the runner user is added to — must be `docker` for the user to control the Docker socket without `sudo`                                                                       |
 | `docker_runner_shell`    | Login shell for the runner user (e.g. `/bin/bash`)                                                                                                                                  |
 | `docker_runner_ssh_key`  | Public key authorized for the runner user. **Defaults to empty**, and the deploy task is skipped entirely when empty (`when: docker_runner_ssh_key \| length > 0`). See note below. |

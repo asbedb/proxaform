@@ -1,7 +1,7 @@
 ---
 - name: Resolve and validate target Rundeck IP binding
   ansible.builtin.set_fact:
-      resolved_rundeck_ip: "{{ rundeck_server_ip | default(ansible_default_ipv4.address | default(ansible_host)) }}"
+      resolved_rundeck_ip: "{{ rundeck_server_ip | default(ansible_facts.default_ipv4.address | default(ansible_host)) }}"
 
 - name: Validate target IP resolution is not localhost
   ansible.builtin.assert:
