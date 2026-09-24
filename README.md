@@ -20,34 +20,43 @@ Proxaform is a free, open-source orchestration tool for provisioning and tearing
     - Ubuntu / Debian
     - RHEL / CentOS / Rocky Linux / AlmaLinux
 - An Ubuntu LXC template downloaded to your Proxmox storage (e.g., `local:vztmpl/ubuntu-24.04...`).
+- If Terraform and Ansible aren't already installed, `setup.sh` installs them for you.
 
-### Privileged User Account Permissions
+## Required Privileges
 
-It is recommended to setup a privleged user account dedicated to terraform to complete the provisioning of your LXC. The Account will require the following permissions to complete the task.
+| Category          | Privileges                                                                             |
+| ----------------- | -------------------------------------------------------------------------------------- |
+| **Datastore**     | `Allocate`, `AllocateSpace`, `AllocateTemplate`, `Audit`                               |
+| **Mapping**       | `Audit`, `Modify`                                                                      |
+| **Permissions**   | `Modify`                                                                               |
+| **Pool**          | `Allocate`, `Audit`                                                                    |
+| **Realm**         | `AllocateUser`                                                                         |
+| **SDN**           | `Allocate`, `Audit`, `Use`                                                             |
+| **Sys**           | `AccessNetwork`, `Audit`, `Console`, `Incoming`, `Modify`, `Syslog`                    |
+| **User**          | `Modify`                                                                               |
+| **VM**            | `Allocate`, `Audit`, `Backup`, `Clone`, `Console`, `Migrate`, `PowerMgmt`, `Replicate` |
+| **VM.Config**     | `CDROM`, `CPU`, `Cloudinit`, `Disk`, `HWType`, `Memory`, `Network`, `Options`          |
+| **VM.GuestAgent** | `Audit`, `FileRead`, `FileSystemMgmt`, `FileWrite`, `Unrestricted`                     |
+| **VM.Snapshot**   | `Snapshot`, `Rollback`                                                                 |
 
-```text
-Datastore.Allocate, Datastore.AllocateSpace, Datastore.AllocateTemplate, Datastore.Audit, Mapping.Audit, Mapping.Modify,
-Permissions.Modify, Pool.Allocate, Pool.Audit, Realm.AllocateUser, SDN.Allocate, SDN.Audit, SDN.Use, Sys.AccessNetwork,
-Sys.Audit, Sys.Console, Sys.Incoming, Sys.Modify, Sys.Syslog, User.Modify, VM.Allocate, VM.Audit, VM.Backup, VM.Clone,
-VM.Config.CDROM, VM.Config.CPU, VM.Config.Cloudinit, VM.Config.Disk, VM.Config.HWType, VM.Config.Memory, VM.Config.Network,
-VM.Config.Options, VM.Console, VM.GuestAgent.Audit, VM.GuestAgent.FileRead, VM.GuestAgent.FileSystemMgmt, VM.GuestAgent.FileWrite,
-VM.GuestAgent.Unrestricted, VM.Migrate, VM.PowerMgmt, VM.Replicate, VM.Snapshot, VM.Snapshot.Rollback
+pveum command below
+
+```bash
+pveum role add MyRole -privs "Datastore.Allocate,Datastore.AllocateSpace,Datastore.AllocateTemplate,Datastore.Audit,Mapping.Audit,Mapping.Modify,Permissions.Modify,Pool.Allocate,Pool.Audit,Realm.AllocateUser,SDN.Allocate,SDN.Audit,SDN.Use,Sys.AccessNetwork,Sys.Audit,Sys.Console,Sys.Incoming,Sys.Modify,Sys.Syslog,User.Modify,VM.Allocate,VM.Audit,VM.Backup,VM.Clone,VM.Config.CDROM,VM.Config.CPU,VM.Config.Cloudinit,VM.Config.Disk,VM.Config.HWType,VM.Config.Memory,VM.Config.Network,VM.Config.Options,VM.Console,VM.GuestAgent.Audit,VM.GuestAgent.FileRead,VM.GuestAgent.FileSystemMgmt,VM.GuestAgent.FileWrite,VM.GuestAgent.Unrestricted,VM.Migrate,VM.PowerMgmt,VM.Replicate,VM.Snapshot,VM.Snapshot.Rollback"
 ```
-
-If Terraform and Ansible aren't already installed, `setup.sh` installs them for you.
 
 ## Directory Structure
 
 ```
 proxaform/
-├── setup.sh              # One-time environment bootstrap
-├── deploy.sh              # Provision a container + run a playbook against it
-├── destroy.sh             # Tear down a previously deployed container
-├── terraform/             # Terraform configuration (providers, resources, variables)
+├── setup.sh                # One-time environment bootstrap
+├── deploy.sh               # Provision a container + run a playbook against it
+├── destroy.sh              # Tear down a previously deployed container
+├── terraform/              # Terraform configuration (providers, resources, variables)
 ├── playbooks/              # Your Ansible playbooks (select at deploy time)
 ├── secrets/                # Generated SSH keys + saved .tfvars configs (gitignored)
 ├── logs/                   # Timestamped run logs (gitignored)
-└── hosts.ini                # Generated Ansible inventory (overwritten each deploy)
+└── inventory/              # Generated Ansible inventory
 ```
 
 ## Getting Started
@@ -85,9 +94,9 @@ You'll then either:
 
 Once the container is provisioned, Proxaform will:
 
-1. Write the container's connection details to `hosts.ini`
-2. Wait for SSH to become reachable
-3. Run your selected Ansible playbook against the new container
+1. Write the container's connection details to the inventory.
+2. Wait for SSH to become reachable.
+3. Run your selected Ansible playbook against the new container.
 
 ### 3. Tear down a container
 
@@ -95,7 +104,7 @@ Once the container is provisioned, Proxaform will:
 ./destroy.sh
 ```
 
-Select the `.tfvars` file matching the deployment you want removed, then type `DESTROY` to confirm. This runs `terraform destroy` against that configuration.
+Select the `.tfvars` file matching the deployment you want removed, then type `DESTROY` to confirm. This runs `terraform destroy` against that configuration and removes references to the host in the inventory file.
 
 ## Security Notes
 
@@ -107,7 +116,7 @@ Select the `.tfvars` file matching the deployment you want removed, then type `D
 
 ## Contributing
 
-Issues and pull requests are welcome on [GitHub](https://github.com/asbedb/proxaform). See the repository for contribution guidelines.
+Issues and pull requests are welcome on [GitHub](https://github.com/asbedb/proxaform).
 
 ## License
 
