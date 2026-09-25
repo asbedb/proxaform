@@ -1,0 +1,17 @@
+---
+# "latest" or a release version such as "15.0.0"
+technitium_version: latest
+
+# ASP.NET Core runtime channel required by Technitium
+technitium_dotnet_channel: "10.0"
+
+# Install libmsquic for DNS-over-QUIC / HTTP/3 (package must exist in your apt sources)
+technitium_install_msquic: false
+
+# Free port 53 and point the host at the local DNS server
+technitium_disable_resolved: true
+technitium_manage_resolve: true
+
+# User and Group
+technitium_server_service_user: "dns-server"
+technitium_server_service_group: "dns-server"

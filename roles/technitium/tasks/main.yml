@@ -1,0 +1,170 @@
+---
+- name: Install prerequisites
+  ansible.builtin.apt:
+      name: [curl, ca-certificates]
+      state: present
+      update_cache: true
+  become: true
+
+- name: Find available ICU package
+  ansible.builtin.shell:
+      cmd: set -o pipefail && apt-cache pkgnames libicu | grep -E '^libicu[0-9]+$' | sort -V | tail -1
+      executable: /bin/bash
+  register: technitium_icu
+  changed_when: false
+
+- name: Install ICU
+  ansible.builtin.apt:
+      name: "{{ technitium_icu.stdout }}"
+      state: present
+  become: true
+
+- name: Install libmsquic
+  ansible.builtin.apt:
+      name: libmsquic
+      state: present
+  become: true
+  when: technitium_install_msquic | bool
+
+- name: Check for ASP.NET Core runtime
+  ansible.builtin.command:
+      cmd: /opt/dotnet/dotnet --list-runtimes
+  register: technitium_dotnet
+  changed_when: false
+  failed_when: false
+
+- name: Install ASP.NET Core runtime
+  when: ('Microsoft.AspNetCore.App ' ~ technitium_dotnet_channel ~ '.') not in (technitium_dotnet.stdout | default(''))
+  become: true
+  block:
+      - name: Download dotnet-install.sh
+        ansible.builtin.get_url:
+            url: https://dot.net/v1/dotnet-install.sh
+            dest: /tmp/dotnet-install.sh
+            mode: "0755"
+      - name: Run dotnet-install.sh
+        ansible.builtin.command:
+            cmd: >-
+                /tmp/dotnet-install.sh -c {{ technitium_dotnet_channel }}
+                --runtime aspnetcore --no-path --install-dir /opt/dotnet
+        changed_when: true
+
+- name: Link dotnet into /usr/bin
+  ansible.builtin.file:
+      src: /opt/dotnet/dotnet
+      dest: /usr/bin/dotnet
+      state: link
+  become: true
+
+- name: Create install directory
+  ansible.builtin.file:
+      path: /opt/technitium/dns
+      state: directory
+      mode: "0755"
+  become: true
+
+- name: Download Technitium DNS Server
+  ansible.builtin.get_url:
+      url: >-
+          {{ 'https://download.technitium.com/dns/DnsServerPortable.tar.gz'
+             if technitium_version == 'latest'
+             else 'https://download.technitium.com/dns/archive/' ~ technitium_version ~ '/DnsServerPortable.tar.gz' }}
+      dest: /opt/technitium/DnsServerPortable.tar.gz
+      force: "{{ technitium_version == 'latest' }}"
+      mode: "0644"
+  become: true
+  register: technitium_download
+
+- name: Check for existing installation
+  ansible.builtin.stat:
+      path: /opt/technitium/dns/DnsServerApp.dll
+  register: technitium_installed
+
+- name: Extract Technitium DNS Server
+  ansible.builtin.unarchive:
+      src: /opt/technitium/DnsServerPortable.tar.gz
+      dest: /opt/technitium/dns
+      remote_src: true
+  become: true
+  when: technitium_download.changed or not technitium_installed.stat.exists
+  notify: Restart dns
+
+- name: Create service user
+  ansible.builtin.user:
+      name: "{{ technitium_server_service_user}}"
+      system: true
+      create_home: false
+      shell: /usr/sbin/nologin
+  become: true
+
+- name: Create config and log directories
+  ansible.builtin.file:
+      path: "{{ item }}"
+      state: directory
+      owner: "{{ technitium_server_service_user}}"
+      group: "{{ technitium_server_service_group}}"
+      mode: "0750"
+  loop: [/etc/dns, /var/log/technitium/dns]
+  become: true
+
+- name: Install systemd unit
+  ansible.builtin.copy:
+      src: /opt/technitium/dns/systemd.service
+      dest: /etc/systemd/system/dns.service
+      remote_src: true
+      mode: "0644"
+  become: true
+  notify:
+      - Reload systemd
+      - Restart dns
+
+- name: Stop and disable systemd-resolved
+  ansible.builtin.systemd_service:
+      name: systemd-resolved
+      state: stopped
+      enabled: false
+  become: true
+  failed_when: false
+  when: technitium_disable_resolved | bool
+
+- name: Enable and start dns.service
+  ansible.builtin.systemd_service:
+      name: dns.service
+      enabled: true
+      state: started
+  become: true
+
+- name: Configure /etc/resolv.conf
+  when: technitium_manage_resolve | bool
+  become: true
+  block:
+      - name: Inspect /etc/resolv.conf
+        ansible.builtin.stat:
+            path: /etc/resolv.conf
+            follow: false
+        register: technitium_resolv
+
+      - name: Remove resolv.conf symlink left by systemd-resolved
+        ansible.builtin.file:
+            path: /etc/resolv.conf
+            state: absent
+        when: technitium_resolv.stat.islnk | default(false)
+
+      - name: Write resolv.conf
+        ansible.builtin.copy:
+            dest: /etc/resolv.conf
+            content: "nameserver 127.0.0.1\n"
+            mode: "0644"
+
+- name: Resolve IP
+  ansible.builtin.set_fact:
+      resolved_ip: "{{ ansible_facts.default_ipv4.address }}"
+
+- name: Display deployment access details
+  ansible.builtin.debug:
+      msg:
+          - "--------------------------------------------------------"
+          - "Technitium installed successfully!"
+          - "Access URL:  http://{{ resolved_ip }}:5380/"
+          - "Access page to set a new password."
+          - "--------------------------------------------------------"
