@@ -1,0 +1,8 @@
+---
+- name: Deploy Technitium DNS Server
+  hosts: technitium_node
+  become: yes
+
+  roles:
+      - common
+      - technitium

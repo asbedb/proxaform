@@ -1,0 +1,11 @@
+---
+- name: Reload systemd
+  ansible.builtin.systemd_service:
+      daemon_reload: true
+  become: true
+
+- name: Restart dns
+  ansible.builtin.systemd_service:
+      name: dns.service
+      state: restarted
+  become: true
