@@ -47,10 +47,10 @@ Installs Node.js/npm, deploys Crontab-UI as a `systemd` service, creates the `cr
 
 ```bash
 # Option A: Provision VM + Configure
-./deploy.sh playbooks/coding/crontab_ui_docker_runner/02_setup_crontab_server.yml
+./deploy.sh playbooks/coding/crontab_ui_docker_runner/02_setup_nodejs_crontab_server.yml
 
 # Option B: Playbook only (existing VM)
-ANSIBLE_CONFIG=./ansible.cfg ansible-playbook -i inventory/hosts.yml playbooks/coding/crontab_ui_docker_runner/02_setup_crontab_server.yml
+ANSIBLE_CONFIG=./ansible.cfg ansible-playbook -i inventory/hosts.yml playbooks/coding/crontab_ui_docker_runner/02_setup_nodejs_crontab_server.yml
 
 ```
 

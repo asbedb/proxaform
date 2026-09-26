@@ -1,0 +1,141 @@
+---
+- name: Sync Time Across All Nodes
+  hosts: all
+  become: yes
+  gather_facts: true
+
+  vars:
+      # Optional IANA timezone to apply, e.g. "Australia/Sydney". Leave empty to keep the current zone.
+      sync_time_timezone: "Australia/Sydney"
+      # Max seconds a node may drift from the Ansible controller before the verify step fails.
+      sync_time_max_drift: 2
+      # Attempts (5s apart) to wait for the time daemon to report a synchronised clock.
+      sync_time_wait_retries: 12
+
+  tasks:
+      - name: Gather service facts
+        ansible.builtin.service_facts:
+      - name: Determine whether the node can manage its own clock
+        ansible.builtin.set_fact:
+            sync_time_managed: "{{ ansible_facts['virtualization_type'] | default('') not in ['lxc', 'container', 'docker', 'podman'] }}"
+
+      - name: Detect the active time daemon
+        ansible.builtin.set_fact:
+            sync_time_daemon: >-
+                {{ 'chrony' if ('chrony.service' in ansible_facts.services or 'chronyd.service' in ansible_facts.services)
+                   else 'systemd-timesyncd' if 'systemd-timesyncd.service' in ansible_facts.services
+                   else 'none' }}
+
+      - name: Install a time daemon when none is present
+        ansible.builtin.package:
+            name: "{{ 'chrony' if ansible_facts['os_family'] == 'RedHat' else 'systemd-timesyncd' }}"
+            state: present
+        when: sync_time_managed and sync_time_daemon == 'none'
+
+      - name: Record the installed time daemon
+        ansible.builtin.set_fact:
+            sync_time_daemon: "{{ 'chrony' if ansible_facts['os_family'] == 'RedHat' else 'systemd-timesyncd' }}"
+        when: sync_time_managed and sync_time_daemon == 'none'
+
+      - name: Check the timezone exists
+        ansible.builtin.stat:
+            path: "/usr/share/zoneinfo/{{ sync_time_timezone }}"
+        register: sync_time_zoneinfo
+        when: sync_time_timezone | length > 0
+
+      - name: Fail on an unknown timezone
+        ansible.builtin.assert:
+            that: sync_time_zoneinfo.stat.exists
+            fail_msg: "Timezone '{{ sync_time_timezone }}' not found in /usr/share/zoneinfo."
+            quiet: true
+        when: sync_time_timezone | length > 0
+
+      - name: Set timezone
+        ansible.builtin.file:
+            src: "/usr/share/zoneinfo/{{ sync_time_timezone }}"
+            dest: /etc/localtime
+            state: link
+            force: true
+        when: sync_time_timezone | length > 0
+
+      - name: Record timezone name (Debian)
+        ansible.builtin.copy:
+            content: "{{ sync_time_timezone }}\n"
+            dest: /etc/timezone
+            mode: "0644"
+        when:
+            - sync_time_timezone | length > 0
+            - ansible_facts['os_family'] == 'Debian'
+
+      - name: Enable NTP synchronisation
+        ansible.builtin.command:
+            cmd: timedatectl set-ntp true
+        register: sync_time_set_ntp
+        changed_when: false
+        when: sync_time_managed
+
+      - name: Ensure the time daemon is running (chrony)
+        ansible.builtin.service:
+            name: "{{ 'chronyd' if ansible_facts['os_family'] == 'RedHat' else 'chrony' }}"
+            state: started
+            enabled: true
+        when: sync_time_managed and sync_time_daemon == 'chrony'
+
+      - name: Restart the time daemon to force a fresh sync (systemd-timesyncd)
+        ansible.builtin.service:
+            name: systemd-timesyncd
+            state: restarted
+            enabled: true
+        when: sync_time_managed and sync_time_daemon == 'systemd-timesyncd'
+
+      - name: Force an immediate clock step (chrony)
+        ansible.builtin.command:
+            cmd: chronyc -a makestep
+        changed_when: true
+        when: sync_time_managed and sync_time_daemon == 'chrony'
+
+      - name: Wait for the clock to report as synchronised
+        ansible.builtin.command:
+            cmd: timedatectl show --property=NTPSynchronized --value
+        register: sync_time_status
+        until: sync_time_status.stdout | trim == 'yes'
+        retries: "{{ sync_time_wait_retries }}"
+        delay: 5
+        changed_when: false
+        when: sync_time_managed
+      - name: Write system time to the hardware clock
+        ansible.builtin.command:
+            cmd: hwclock --systohc
+        changed_when: true
+        failed_when: false
+        when: sync_time_managed
+      - name: Read the node clock
+        ansible.builtin.command:
+            cmd: date -u +%s
+        register: sync_time_node_epoch
+        changed_when: false
+
+      - name: Read the node timezone
+        ansible.builtin.command:
+            cmd: date +%Z
+        register: sync_time_node_tz
+        changed_when: false
+
+      - name: Compare node clock against the Ansible controller
+        ansible.builtin.set_fact:
+            sync_time_drift: "{{ (sync_time_node_epoch.stdout | int - now().timestamp() | int) | abs }}"
+
+      - name: Report time status
+        ansible.builtin.debug:
+            msg:
+                - "Daemon:      {{ sync_time_daemon if sync_time_managed else 'n/a (container uses host clock)' }}"
+                - "Timezone:    {{ sync_time_node_tz.stdout }}{{ ' (' ~ sync_time_timezone ~ ')' if sync_time_timezone | length > 0 else '' }}"
+                - "Node UTC:    {{ '%Y-%m-%d %H:%M:%S' | strftime(sync_time_node_epoch.stdout | int, utc=true) }}"
+                - "Drift:       {{ sync_time_drift }}s from controller"
+
+      - name: Verify drift is within tolerance
+        ansible.builtin.assert:
+            that: sync_time_drift | int <= sync_time_max_drift | int
+            fail_msg: "{{ inventory_hostname }} is {{ sync_time_drift }}s off the controller (limit {{ sync_time_max_drift }}s)."
+            success_msg: "{{ inventory_hostname }} clock is in sync."
+            quiet: true
