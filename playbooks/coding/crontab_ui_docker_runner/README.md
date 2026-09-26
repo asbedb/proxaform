@@ -71,7 +71,7 @@ ANSIBLE_CONFIG=./ansible.cfg ansible-playbook -i inventory/hosts.yml playbooks/c
 
 | Service        | Protocol / URL                     | Default Credentials | Notes                               |
 | -------------- | ---------------------------------- | ------------------- | ----------------------------------- |
-| **Crontab-UI** | `http://<crontab_server_ip>:8000/` | `admin` / `admin`   | Takes ~10s to spin up on first boot |
+| **Crontab-UI** | `http://<crontab_server_ip>:9000/` | `admin` / `admin`   | Takes ~10s to spin up on first boot |
 | **Portainer**  | `https://<docker_server_ip>:9443`  | `admin` / `admin`   | Self-signed SSL certificate         |
 
 ---

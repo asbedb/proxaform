@@ -1,28 +1,72 @@
 ---
-- name: Configure SSH Trust on Docker Node
+- name: Ensure crontab user has an SSH key
+  hosts: crontab_node
+  become: yes
+  tasks:
+      - name: Ensure .ssh directory exists
+        ansible.builtin.file:
+            path: /var/lib/crontab/.ssh
+            state: directory
+            owner: crontab
+            group: crontab
+            mode: "0700"
+
+      - name: Generate key if missing (no-op if it exists)
+        community.crypto.openssh_keypair:
+            path: /var/lib/crontab/.ssh/id_ed25519
+            type: ed25519
+            owner: crontab
+            group: crontab
+            mode: "0600"
+
+- name: Trust crontab key on Docker node
   hosts: docker_node
   become: yes
   tasks:
-      - name: Slurp crontab public key from crontab server
+      - name: Read crontab public key
         ansible.builtin.slurp:
-            src: "/var/lib/crontab/.ssh/id_ed25519.pub"
+            src: /var/lib/crontab/.ssh/id_ed25519.pub
         delegate_to: "{{ groups['crontab_node'][0] }}"
         register: crontab_pub_key
 
-      - name: Ensure authorized_keys contains crontab public key
+      - name: Authorize ONLY the current crontab key
         ansible.posix.authorized_key:
-            user: "docker-runner"
-            state: present
+            user: docker-runner
             key: "{{ crontab_pub_key.content | b64decode }}"
+            key_options: restrict
+            exclusive: true
+            state: present
 
-- name: Test SSH from Crontab host to Docker node
+      - name: Read this node's SSH host key
+        ansible.builtin.slurp:
+            src: /etc/ssh/ssh_host_ed25519_key.pub
+        register: docker_host_key
+
+- name: Pin Docker node host key and test
   hosts: crontab_node
   become: yes
   become_user: crontab
+  vars:
+      docker_host: "{{ groups['docker_node'][0] }}"
+      docker_addr: >-
+          {{ hostvars[docker_host]['ansible_host']
+             | default(hostvars[docker_host]['ansible_facts']['default_ipv4']['address']) }}
+      host_key: >-
+          {{ (hostvars[docker_host].docker_host_key.content | b64decode).split()[0:2] | join(' ') }}
   tasks:
-      - name: Test SSH connection to Docker node
+      - name: Replace any old host key with the current one
+        ansible.builtin.known_hosts:
+            path: /var/lib/crontab/.ssh/known_hosts
+            name: "{{ docker_addr }}"
+            key: "{{ docker_addr }} {{ host_key }}"
+            state: present
+
+      - name: Test SSH connection (strict checking now safe)
         ansible.builtin.command:
-            cmd: "ssh -i /var/lib/crontab/.ssh/id_ed25519 -o BatchMode=yes -o StrictHostKeyChecking=accept-new docker-runner@{{ hostvars[groups['docker_node'][0]]['ansible_host'] | default(hostvars[groups['docker_node'][0]]['ansible_facts']['default_ipv4']['address']) }} 'echo Connection successful!'"
+            cmd: >-
+                ssh -i /var/lib/crontab/.ssh/id_ed25519
+                -o BatchMode=yes -o StrictHostKeyChecking=yes
+                docker-runner@{{ docker_addr }} 'echo Connection successful!'
         register: ssh_test
         changed_when: false
 

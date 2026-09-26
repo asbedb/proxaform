@@ -1,11 +1,11 @@
 #SPDX-License-Identifier: MIT-0
 ---
 host: "0.0.0.0"
-port: 9000
-base_urlL: ""
+target_port: 9000
+base_url: ""
 cron_db_path: "/root/.cron/crontab-ui"
 basic_auth_user: "admin"
-basic_auth_pwd: "Password"
+basic_auth_pwd: "admin"
 ssl_cert_path: ""
 ssl_key_path: ""
 enable_autosave: false

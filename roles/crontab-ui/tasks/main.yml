@@ -106,7 +106,7 @@
 
 - name: Wait for crontab-ui web service to become active
   ansible.builtin.uri:
-      url: "http://127.0.0.1:{{ port }}"
+      url: "http://127.0.0.1:{{ target_port }}"
       status_code: [200, 401]
   register: crontab_ui_health
   until: crontab_ui_health.status in [200, 401]
@@ -119,5 +119,5 @@
           - "--------------------------------------------------------"
           - "crontab-ui successfully deployed and verified!"
           - "Status Code: {{ crontab_ui_health.status }}"
-          - "Access URL:  http://{{ ansible_facts['default_ipv4']['address'] }}:{{ port }}{{ base_url }}"
+          - "Access URL:  http://{{ ansible_facts['default_ipv4']['address'] }}:{{ target_port }}{{ base_url }}"
           - "--------------------------------------------------------"
