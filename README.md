@@ -4,46 +4,44 @@ Proxaform is a free, open-source orchestration tool for provisioning and tearing
 
 ## Features
 
-- One-command environment bootstrap (installs Terraform + Ansible if missing)
+- One-command environment bootstrap (installs Terraform, Ansible and `yq` if missing)
 - Interactive prompts to define new container configurations, saved as reusable `.tfvars` files
-- Automatic Ansible inventory generation from Terraform outputs
+- Automatic SSH key injection — no keys to copy or paste
+- Automatic Ansible inventory generation with group assignment
 - Waits for SSH availability before running your playbook
-- Playbook selection menu — drop any `.yml`/`.yaml` file into `playbooks/` and it's available immediately
-- Guarded, confirmation-gated teardown of previously deployed containers
+- Playbook selection menu — any `.yml`/`.yaml` file under `playbooks/` is available immediately
+- Guarded, confirmation-gated teardown that also cleans up the inventory
 - Full run logging to timestamped files under `logs/`
 
-## Prerequisites
+## Documentation
 
-- A Proxmox VE host with API access
-- A privileged Proxmox user/account with permission to create and destroy containers
-- One of the following operating systems on the machine running Proxaform:
-    - Ubuntu / Debian
-    - RHEL / CentOS / Rocky Linux / AlmaLinux
-- An Ubuntu LXC template downloaded to your Proxmox storage (e.g., `local:vztmpl/ubuntu-24.04...`).
-- If Terraform and Ansible aren't already installed, `setup.sh` installs them for you.
+New to Proxaform? Follow the step-by-step guide:
 
-## Required Privileges
+1. **[Getting Started](docs/01_Getting_Started.md)** — prerequisites, Proxmox user & permissions, running `setup.sh`, and how the SSH key works
+2. **[First Deployment](docs/02_First_Deployment.md)** — what `.tfvars` files are, how to create them, and a full walkthrough of deploying a container
+3. **[Teardown](docs/03_Teardown.md)** — safely removing a deployed container
 
-| Category          | Privileges                                                                             |
-| ----------------- | -------------------------------------------------------------------------------------- |
-| **Datastore**     | `Allocate`, `AllocateSpace`, `AllocateTemplate`, `Audit`                               |
-| **Mapping**       | `Audit`, `Modify`                                                                      |
-| **Permissions**   | `Modify`                                                                               |
-| **Pool**          | `Allocate`, `Audit`                                                                    |
-| **Realm**         | `AllocateUser`                                                                         |
-| **SDN**           | `Allocate`, `Audit`, `Use`                                                             |
-| **Sys**           | `AccessNetwork`, `Audit`, `Console`, `Incoming`, `Modify`, `Syslog`                    |
-| **User**          | `Modify`                                                                               |
-| **VM**            | `Allocate`, `Audit`, `Backup`, `Clone`, `Console`, `Migrate`, `PowerMgmt`, `Replicate` |
-| **VM.Config**     | `CDROM`, `CPU`, `Cloudinit`, `Disk`, `HWType`, `Memory`, `Network`, `Options`          |
-| **VM.GuestAgent** | `Audit`, `FileRead`, `FileSystemMgmt`, `FileWrite`, `Unrestricted`                     |
-| **VM.Snapshot**   | `Snapshot`, `Rollback`                                                                 |
+## Quick Start
 
-pveum command below
+For those already comfortable with Proxmox, Terraform and Ansible.
+
+**Requirements:** Ubuntu/Debian or RHEL-family control machine with `sudo` and `nc`; a Proxmox VE user with the [required privileges](docs/01_Getting_Started.md#2b-create-a-role-with-the-required-privileges); an Ubuntu LXC template on your Proxmox storage.
 
 ```bash
-pveum role add MyRole -privs "Datastore.Allocate,Datastore.AllocateSpace,Datastore.AllocateTemplate,Datastore.Audit,Mapping.Audit,Mapping.Modify,Permissions.Modify,Pool.Allocate,Pool.Audit,Realm.AllocateUser,SDN.Allocate,SDN.Audit,SDN.Use,Sys.AccessNetwork,Sys.Audit,Sys.Console,Sys.Incoming,Sys.Modify,Sys.Syslog,User.Modify,VM.Allocate,VM.Audit,VM.Backup,VM.Clone,VM.Config.CDROM,VM.Config.CPU,VM.Config.Cloudinit,VM.Config.Disk,VM.Config.HWType,VM.Config.Memory,VM.Config.Network,VM.Config.Options,VM.Console,VM.GuestAgent.Audit,VM.GuestAgent.FileRead,VM.GuestAgent.FileSystemMgmt,VM.GuestAgent.FileWrite,VM.GuestAgent.Unrestricted,VM.Migrate,VM.PowerMgmt,VM.Replicate,VM.Snapshot,VM.Snapshot.Rollback"
+git clone https://github.com/asbedb/proxaform.git && cd proxaform
+./setup.sh                                  # install deps, create SSH key -> secrets/id_ed25519.pub
+./deploy.sh playbooks/networking/ping.yml   # provision a container + run a playbook
+./destroy.sh                                # tear it down
 ```
+
+Key points:
+
+- **`.tfvars` files** live in `secrets/`. Create one via the `deploy.sh` wizard, or copy `terraform/terraform.tfvars.example` there and edit it. **One `.tfvars` file = one container** — its state is stored alongside it as `<name>.tfstate`.
+- **`authorised_ssh_key` is automatic.** `deploy.sh` injects `secrets/id_ed25519.pub`; do not put it in your `.tfvars`.
+- **Passwords are prompted, not stored.** Terraform asks for `proxmox_privileged_user_password` and `container_root_password` at deploy/destroy time.
+- **Inventory groups matter.** Every node joins `proxmox_nodes`; add the group named in your playbook's `hosts:` line when prompted.
+
+See the [`.tfvars` reference](docs/02_First_Deployment.md#understanding-tfvars-files) for every variable.
 
 ## Directory Structure
 
@@ -52,66 +50,21 @@ proxaform/
 ├── setup.sh                # One-time environment bootstrap
 ├── deploy.sh               # Provision a container + run a playbook against it
 ├── destroy.sh              # Tear down a previously deployed container
-├── terraform/              # Terraform configuration (providers, resources, variables)
-├── playbooks/              # Your Ansible playbooks (select at deploy time)
-├── secrets/                # Generated SSH keys + saved .tfvars configs (gitignored)
-├── logs/                   # Timestamped run logs (gitignored)
-└── inventory/              # Generated Ansible inventory
+├── docs/                   # Step-by-step guides
+├── terraform/              # Terraform configuration + terraform.tfvars.example
+├── playbooks/              # Ansible playbooks, grouped by category
+├── roles/                  # Ansible roles used by the playbooks
+├── inventory/              # Generated Ansible inventory (hosts.yml)
+├── secrets/                # SSH public key, .tfvars and .tfstate files (gitignored)
+└── logs/                   # Timestamped run logs (gitignored)
 ```
-
-## Getting Started
-
-### Clone the Repository
-
-```bash
-git clone https://github.com/asbedb/proxaform.git
-```
-
-### 1. Run the setup script
-
-```bash
-./setup.sh
-```
-
-This will:
-
-- Detect your OS and install Terraform, Ansible, and required system packages
-- Generate a local ED25519 SSH keypair at `~/.ssh/id_ed25519` (skipped if one already exists)
-- Mirror the public key to `secrets/id_ed25519.pub` for use during provisioning
-
-### 2. Deploy a container
-
-```bash
-./deploy.sh [path/to/playbook.yml]
-```
-
-If no playbook path is given, you'll be prompted to choose one from `playbooks/`.
-
-You'll then either:
-
-- Select an existing `.tfvars` config from `secrets/`, or
-- Walk through an interactive prompt to define a new one (node name, template, network config, disk size, Proxmox credentials, etc.), which is saved as a new `.tfvars` file for reuse
-
-Once the container is provisioned, Proxaform will:
-
-1. Write the container's connection details to the inventory.
-2. Wait for SSH to become reachable.
-3. Run your selected Ansible playbook against the new container.
-
-### 3. Tear down a container
-
-```bash
-./destroy.sh
-```
-
-Select the `.tfvars` file matching the deployment you want removed, then type `DESTROY` to confirm. This runs `terraform destroy` against that configuration and removes references to the host in the inventory file.
 
 ## Security Notes
 
-- `secrets/` and `logs/` are excluded from version control via `.gitignore`, along with `*.tfvars`, `*.tfstate*`, and other sensitive Terraform artifacts.
-- Proxmox and OS-level credentials are collected at runtime and are not written into saved `.tfvars` files — you'll be prompted for them each time `deploy.sh` or `destroy.sh` needs to authenticate.
+- `secrets/` and `logs/` are excluded from version control via `.gitignore`, along with `*.tfvars`, `*.tfstate*`, `hosts.yml` and other sensitive Terraform artifacts.
+- Passwords are not written into `.tfvars` files created by the wizard; Terraform prompts for them each time `deploy.sh` or `destroy.sh` runs. If you add them to a hand-written `.tfvars` file, they are stored in plain text.
 - Terraform variables carrying credentials are marked `sensitive = true`, which redacts them from `plan`/`apply` console output.
-- Terraform state still stores applied values in plaintext by default. If you sync, back up, or share `terraform.tfstate`, consider enabling state encryption or moving to a remote encrypted backend.
+- Terraform state stores applied values (including passwords) in plaintext. The state files in `secrets/` should be treated as secrets — if you sync, back up, or share them, consider encryption or a remote encrypted backend.
 - `insecure = true` is set on the Proxmox provider for convenience with self-signed certificates — replace this with proper TLS verification in production environments.
 
 ## Contributing

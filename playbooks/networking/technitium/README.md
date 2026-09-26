@@ -4,9 +4,9 @@ Provisions a Technitium node after applying common patches and updates.
 
 ## Architecture
 
-| Node     | Inventory Group    | Role & Services              |
-| -------- | ------------------ | ---------------------------- |
-| **VM 1** | `technitiumn_node` | Runs Technitium DNS Software |
+| Node     | Inventory Group   | Role & Services              |
+| -------- | ----------------- | ---------------------------- |
+| **VM 1** | `technitium_node` | Runs Technitium DNS Software |
 
 ---
 
