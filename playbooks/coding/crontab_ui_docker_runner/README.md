@@ -34,10 +34,10 @@ Installs Docker Engine, creates the `docker-runner` execution user, and deploys 
 
 ```bash
 # Option A: Provision VM + Configure
-./deploy.sh playbooks/crontab_ui_docker_runner/01_setup_docker_host.yml
+./deploy.sh playbooks/coding/crontab_ui_docker_runner/01_setup_docker_host.yml
 
 # Option B: Playbook only (existing VM)
-ANSIBLE_CONFIG=./ansible.cfg ansible-playbook -i inventory/hosts.yml playbooks/crontab_ui_docker_runner/01_setup_docker_host.yml
+ANSIBLE_CONFIG=./ansible.cfg ansible-playbook -i inventory/hosts.yml playbooks/coding/crontab_ui_docker_runner/01_setup_docker_host.yml
 
 ```
 
@@ -47,10 +47,10 @@ Installs Node.js/npm, deploys Crontab-UI as a `systemd` service, creates the `cr
 
 ```bash
 # Option A: Provision VM + Configure
-./deploy.sh playbooks/crontab_ui_docker_runner/02_setup_crontab_server.yml
+./deploy.sh playbooks/coding/crontab_ui_docker_runner/02_setup_crontab_server.yml
 
 # Option B: Playbook only (existing VM)
-ANSIBLE_CONFIG=./ansible.cfg ansible-playbook -i inventory/hosts.yml playbooks/crontab_ui_docker_runner/02_setup_crontab_server.yml
+ANSIBLE_CONFIG=./ansible.cfg ansible-playbook -i inventory/hosts.yml playbooks/coding/crontab_ui_docker_runner/02_setup_crontab_server.yml
 
 ```
 
@@ -61,7 +61,7 @@ ANSIBLE_CONFIG=./ansible.cfg ansible-playbook -i inventory/hosts.yml playbooks/c
 Establishes passwordless SSH access from `crontabui-server` to `docker-server` and verifies cross-node connectivity.
 
 ```bash
-ANSIBLE_CONFIG=./ansible.cfg ansible-playbook -i inventory/hosts.yml playbooks/crontab_ui_docker_runner/03_connect_services_verify.yml
+ANSIBLE_CONFIG=./ansible.cfg ansible-playbook -i inventory/hosts.yml playbooks/coding/crontab_ui_docker_runner/03_connect_services_verify.yml
 
 ```
 
