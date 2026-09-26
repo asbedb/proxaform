@@ -31,10 +31,10 @@ Installs common tools, creates a service user and deploys technitium on the node
 
 ```bash
 # Option A: Provision VM + Configure
-./deploy.sh playbooks/technitium/01_deploy_technitium.yml
+./deploy.sh playbooks/networking/technitium/01_deploy_technitium.yml
 
 # Option B: Playbook only (existing VM)
-ANSIBLE_CONFIG=./ansible.cfg ansible-playbook -i inventory/hosts.yml playbooks/technitium/01_deploy_technitium.yml
+ANSIBLE_CONFIG=./ansible.cfg ansible-playbook -i inventory/hosts.yml playbooks/networking/technitium/01_deploy_technitium.yml
 
 ```
 

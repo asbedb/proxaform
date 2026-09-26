@@ -34,11 +34,10 @@ Installs Docker Engine, creates the `rundeck-runner` execution user, and deploys
 
 ```bash
 # Option A: Provision VM + Configure
-./deploy.sh playbooks/rundeck_docker_runner/01_setup_docker_host.yml
+./deploy.sh playbooks/coding/rundeck_docker_runner/01_setup_docker_host.yml
 
 # Option B: Playbook only (existing VM)
-ANSIBLE_CONFIG=./ansible.cfg ansible-playbook -i inventory/hosts.yml playbooks/rundeck_docker_runner/01_setup_docker_host.yml
-
+ANSIBLE_CONFIG=./ansible.cfg ansible-playbook -i inventory/hosts.yml playbooks/coding/rundeck_docker_runner/01_setup_docker_host.yml
 ```
 
 ### Step 2: Provision & Configure Rundeck Control Plane (VM 2)
@@ -47,11 +46,10 @@ Installs Rundeck and the `rd` CLI tool, generates the dedicated SSH keypair, and
 
 ```bash
 # Option A: Provision VM + Configure
-./deploy.sh playbooks/rundeck_docker_runner/02_setup_rundeck_server.yml
+./deploy.sh playbooks/coding/rundeck_docker_runner/02_setup_rundeck_server.yml
 
 # Option B: Playbook only (existing VM)
-ANSIBLE_CONFIG=./ansible.cfg ansible-playbook -i inventory/hosts.yml playbooks/rundeck_docker_runner/02_setup_rundeck_server.yml
-
+ANSIBLE_CONFIG=./ansible.cfg ansible-playbook -i inventory/hosts.yml playbooks/coding/rundeck_docker_runner/02_setup_rundeck_server.yml
 ```
 
 > **Recommended VM Specs:** 2 CPU cores, 2 GB RAM.
@@ -61,8 +59,7 @@ ANSIBLE_CONFIG=./ansible.cfg ansible-playbook -i inventory/hosts.yml playbooks/r
 Establishes passwordless SSH trust, creates the initial Rundeck project, registers the Docker host as a managed node resource, and verifies inventory visibility.
 
 ```bash
-ANSIBLE_CONFIG=./ansible.cfg ansible-playbook -i inventory/hosts.yml playbooks/rundeck_docker_runner/03_connect_services_verify.yml
-
+ANSIBLE_CONFIG=./ansible.cfg ansible-playbook -i inventory/hosts.yml playbooks/coding/rundeck_docker_runner/03_connect_services_verify.yml
 ```
 
 ---
