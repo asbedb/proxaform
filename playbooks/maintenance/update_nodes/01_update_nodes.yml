@@ -1,0 +1,51 @@
+---
+- name: Update Packages Across All Nodes
+  hosts: all
+  become: yes
+  gather_facts: true
+
+  vars:
+      # apt upgrade mode: "safe" (apt upgrade) or "dist" (apt full-upgrade, may add/remove packages).
+      update_nodes_upgrade_type: "safe"
+      # Remove packages that are no longer required after the upgrade.
+      update_nodes_autoremove: true
+      # Reboot nodes that report /var/run/reboot-required after upgrading.
+      update_nodes_reboot: false
+
+  tasks:
+      - name: Skip nodes that are not Debian based
+        ansible.builtin.meta: end_host
+        when: ansible_facts['os_family'] != 'Debian'
+
+      - name: Update the apt package cache
+        ansible.builtin.apt:
+            update_cache: true
+
+      - name: Upgrade packages
+        ansible.builtin.apt:
+            upgrade: "{{ update_nodes_upgrade_type }}"
+        register: update_nodes_upgrade
+
+      - name: Remove packages that are no longer required
+        ansible.builtin.apt:
+            autoremove: true
+            autoclean: true
+        when: update_nodes_autoremove | bool
+
+      - name: Check whether a reboot is required
+        ansible.builtin.stat:
+            path: /var/run/reboot-required
+        register: update_nodes_reboot_required
+
+      - name: Report update status
+        ansible.builtin.debug:
+            msg:
+                - "Packages:    {{ 'upgraded' if update_nodes_upgrade.changed else 'already up to date' }}"
+                - "Reboot:      {{ 'required' if update_nodes_reboot_required.stat.exists else 'not required' }}"
+
+      - name: Reboot the node when required
+        ansible.builtin.reboot:
+            msg: "Rebooting after package upgrade"
+        when:
+            - update_nodes_reboot | bool
+            - update_nodes_reboot_required.stat.exists
